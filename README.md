@@ -58,6 +58,7 @@ sudo pacman -S --needed base-devel libusb git python \
 - Python 3.8+
 - MSYS2 with MinGW-w64 toolchain
 - Zadig (for USB driver installation)
+- e2fsprogs (provides `debugfs`, used to edit `mode.json` inside the ext filesystem image without mounting)
 - ~20GB free disk space
 
 ## What Does It Do?
@@ -75,6 +76,28 @@ sudo pacman -S --needed base-devel libusb git python \
 ./jibo_automod.sh
 ```
 
+## Optional GUI
+
+The GUI is separate from the CLI tools. You can still run `jibo_automod.sh` / `jibo_updater.sh` directly.
+
+Install GUI deps:
+
+```bash
+python3 -m pip install -r requirements-gui.txt
+```
+
+Launch main panel (Linux):
+
+```bash
+./jibo_gui.sh
+```
+
+Launch main panel (Windows):
+
+```bat
+jibo_gui.bat
+```
+
 ### Just Dump (no modification)
 ```bash
 ./jibo_automod.sh --dump-only -o my_jibo_backup.bin
@@ -90,6 +113,20 @@ sudo pacman -S --needed base-devel libusb git python \
 ./jibo_automod.sh --write-partition var_modified.bin --start-sector 0x7E9022
 ```
 
+### Fast Mode (GPT + /var only)
+This avoids the 15GB full dump by reading just the partition table + the ~500MB `/var` partition,
+editing `/var/jibo/mode.json`, and writing back only the changed sectors.
+
+```bash
+./jibo_automod.sh --mode-json-only
+```
+
+If patch-writing is not desired (or your filesystem changes a lot of blocks), force a full `/var` write:
+
+```bash
+./jibo_automod.sh --mode-json-only --full-var-write
+```
+
 ## Command Line Options
 
 | Option | Description |
@@ -102,6 +139,8 @@ sudo pacman -S --needed base-devel libusb git python \
 | `--rebuild-shofel` | Force rebuild of exploit tool |
 | `--skip-detection` | Skip USB device detection |
 | `--no-verify` | Skip write verification |
+| `--mode-json-only` | Fast mode: dump GPT + /var only, patch `mode.json`, write back minimal changes |
+| `--full-var-write` | With `--mode-json-only`: write entire /var partition instead of patch-writing |
 
 ## Entering RCM Mode
 
@@ -134,6 +173,42 @@ Once the tool completes successfully:
    # Password: jibo
    ```
 
+## Updating Jibo (JiboOs releases)
+
+This repo also includes an updater that can pull the latest release from the JiboOs Gitea repo,
+then upload the release `build/` overlay into Jibo’s `/` over SFTP.
+
+### Install updater dependency
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
+### Run updater
+
+```bash
+./jibo_updater.sh --ip <jibo-ip-address>
+```
+
+Windows:
+
+```bat
+jibo_updater.bat --ip <jibo-ip-address>
+```
+
+Stable-only (ignore prereleases):
+
+```bash
+python3 jibo_updater.py --ip <jibo-ip-address> --stable
+```
+
+If the release archive layout changes and the tool can’t find the `build/` folder automatically,
+pass it explicitly (path is relative to the extracted archive root):
+
+```bash
+python3 jibo_updater.py --ip <jibo-ip-address> --build-path V3.1/build
+```
+
 ## Troubleshooting
 
 ### "Jibo not found in RCM mode"
@@ -144,6 +219,15 @@ Once the tool completes successfully:
 ### "Permission denied" on Linux
 - Run with sudo: `sudo ./jibo_automod.sh`
 - Or add udev rules for the Nvidia APX device
+
+### Windows: mode.json edit fails / raw patch warning
+If you see messages about raw edits needing padding, install `debugfs` via MSYS2 so the tool can edit the ext filesystem image safely:
+
+1. Install MSYS2: https://www.msys2.org/
+2. In an MSYS2 terminal:
+   - `pacman -S --needed e2fsprogs`
+
+Then re-run with `--mode-json-only`.
 
 ### Build fails
 - Make sure ARM toolchain is installed

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f2f2f2"/>
+      <stop offset="1" stop-color="#d9d9d9"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="256" height="256" fill="none"/>
+  <circle cx="128" cy="128" r="110" fill="url(#g)" stroke="#9a9a9a" stroke-width="6"/>
+  <circle cx="128" cy="128" r="70" fill="#ffffff" stroke="#b3b3b3" stroke-width="6"/>
+  <rect x="88" y="168" width="80" height="26" rx="13" fill="#c7c7c7"/>
+  <text x="128" y="128" font-family="sans-serif" font-size="28" text-anchor="middle" fill="#444">Jibo</text>
+</svg>

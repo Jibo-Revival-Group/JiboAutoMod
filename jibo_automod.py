@@ -219,6 +219,10 @@ def check_windows_dependencies() -> Tuple[bool, List[str], List[str]]:
     # Check for make
     if not shutil.which("make") and not shutil.which("mingw32-make"):
         missing.append("GNU Make")
+
+    # Optional: debugfs for editing ext filesystem images without mounting
+    if not shutil.which("debugfs") and not shutil.which("debugfs.exe"):
+        warnings.append("debugfs (e2fsprogs) - optional but recommended for reliable mode.json edits on Windows")
     
     return len(missing) == 0, missing, warnings
 
@@ -613,93 +617,54 @@ def modify_mode_json_direct(partition_path: Path) -> bool:
     Modify mode.json directly in the partition image by searching for the pattern.
     This works on both Linux and Windows without mounting.
     """
-    print_info("Searching for mode.json in partition...")
-    
+    print_info("Searching for mode.json in partition (raw, no mount)...")
+
+    def _is_safe_pad_byte(b: int) -> bool:
+        return b in (0x00, 0x09, 0x0A, 0x0D, 0x20)
+
     try:
         with open(partition_path, "r+b") as f:
-            data = f.read()
-            
-            # Search for the mode.json content pattern
-            # The file contains: {"mode": "normal"} or similar
-            patterns_to_find = [
-                b'"mode": "normal"',
-                b'"mode":"normal"',
-                b'"mode" : "normal"',
+            data = bytearray(f.read())
+
+            # Best-effort raw replacement.
+            # IMPORTANT: never change image length and never shift bytes; only overwrite in-place.
+            json_patterns = [
+                (b'{"mode":"normal"}', b'{"mode":"int-developer"}'),
+                (b'{"mode": "normal"}', b'{"mode": "int-developer"}'),
+                (b'{ "mode": "normal" }', b'{"mode":"int-developer"}'),
             ]
-            
-            replacement = b'"mode": "int-developer"'
-            
-            modified = False
-            for pattern in patterns_to_find:
-                if pattern in data:
-                    # Calculate padding needed
-                    pad_len = len(pattern) - len(replacement)
-                    if pad_len > 0:
-                        # Original is longer, we need to pad replacement
-                        # Actually, we need to be careful here - let's make them same size
-                        replacement_padded = replacement + b' ' * pad_len
-                    elif pad_len < 0:
-                        # Replacement is longer - this is a problem
-                        # "normal" (6 chars) vs "int-developer" (13 chars)
-                        # Original: "mode": "normal" (16 chars)
-                        # New:      "mode": "int-developer" (23 chars)
-                        # We need to find the full JSON object and replace it
-                        continue
-                    else:
-                        replacement_padded = replacement
-                    
-                    # Find offset
-                    offset = data.find(pattern)
-                    print_info(f"Found pattern at offset {offset} (0x{offset:x})")
-                    
-                    # This simple replacement won't work due to size difference
-                    # We need a smarter approach
-                    modified = True
-                    break
-            
-            if not modified:
-                # Try finding the full JSON object
-                json_patterns = [
-                    (b'{"mode":"normal"}', b'{"mode":"int-developer"}'),
-                    (b'{"mode": "normal"}', b'{"mode": "int-developer"}'),
-                    (b'{ "mode": "normal" }', b'{"mode":"int-developer"}'),
-                ]
-                
-                for old_json, new_json in json_patterns:
-                    if old_json in data:
-                        offset = data.find(old_json)
-                        print_info(f"Found mode.json at offset {offset} (0x{offset:x})")
-                        
-                        # Check if there's enough space (look at surrounding nulls/padding)
-                        end_offset = offset + len(old_json)
-                        
-                        # The new JSON is longer, so we need to check if there's padding
-                        size_diff = len(new_json) - len(old_json)
-                        
-                        if size_diff > 0:
-                            # Check if the bytes after the old JSON are nulls or whitespace
-                            following_bytes = data[end_offset:end_offset + size_diff]
-                            if all(b == 0 or b == 0x20 or b == 0x0a for b in following_bytes):
-                                # Safe to overwrite
-                                new_data = data[:offset] + new_json + data[end_offset + size_diff:]
-                            else:
-                                # Not safe, need to use filesystem modification
-                                print_warning("Cannot safely modify in-place, using filesystem mount")
-                                return False
-                        else:
-                            # Replacement is shorter or same size, pad with nulls
-                            padding = b'\x00' * (-size_diff)
-                            new_data = data[:offset] + new_json + padding + data[end_offset:]
-                        
-                        # Write modified data
-                        f.seek(0)
-                        f.write(new_data)
-                        print_success("mode.json modified successfully!")
-                        return True
-            
-            print_warning("mode.json pattern not found, trying filesystem mount...")
+
+            for old_json, new_json in json_patterns:
+                offset = bytes(data).find(old_json)
+                if offset == -1:
+                    continue
+
+                print_info(f"Found mode.json JSON at offset {offset} (0x{offset:x})")
+                end_offset = offset + len(old_json)
+
+                if len(new_json) <= len(old_json):
+                    region_len = len(old_json)
+                    replacement = new_json + b" " * (region_len - len(new_json))
+                    data[offset:offset + region_len] = replacement
+                else:
+                    extra = len(new_json) - len(old_json)
+                    following = data[end_offset:end_offset + extra]
+                    if len(following) != extra or not all(_is_safe_pad_byte(b) for b in following):
+                        print_warning("Raw edit would require growing the file and no safe padding was found")
+                        return False
+
+                    region_len = len(new_json)
+                    # Overwrite the JSON plus the padding region; do NOT shift bytes.
+                    data[offset:offset + region_len] = new_json
+
+                f.seek(0)
+                f.write(data)
+                print_success("mode.json modified successfully (raw in-place overwrite)")
+                return True
+
+            print_warning("mode.json pattern not found (raw). Will try filesystem mount if available...")
             return False
-            
+
     except Exception as e:
         print_error(f"Direct modification failed: {e}")
         return False
@@ -737,10 +702,49 @@ def modify_partition_mounted(partition_path: Path) -> bool:
         
         if mode_json_path.exists():
             print_info(f"Found mode.json at {mode_json_path}")
-            
-            # Read current content
-            with open(mode_json_path, "r") as f:
-                content = json.load(f)
+
+            # Capture original permissions/ownership so we can restore after copy-write
+            perm = None
+            uid = None
+            gid = None
+            try:
+                stat_res = run_command(
+                    ["stat", "-c", "%a %u %g", str(mode_json_path)],
+                    sudo=True,
+                    capture_output=True,
+                    check=True,
+                )
+                parts = stat_res.stdout.strip().split()
+                if len(parts) == 3:
+                    perm, uid, gid = parts[0], parts[1], parts[2]
+            except Exception:
+                pass
+
+            # Save a raw backup copy of mode.json for debugging/recovery
+            try:
+                backup_text = run_command(
+                    ["cat", str(mode_json_path)],
+                    sudo=True,
+                    capture_output=True,
+                    check=True,
+                ).stdout
+                (WORK_DIR / "mode.json.original").write_text(backup_text)
+            except Exception:
+                pass
+
+            # Read current content (prefer sudo cat so permissions don't bite us)
+            try:
+                mode_text = run_command(
+                    ["cat", str(mode_json_path)],
+                    sudo=True,
+                    capture_output=True,
+                    check=True,
+                ).stdout
+                content = json.loads(mode_text)
+            except Exception:
+                # Fallback: direct open (works if script is run with sudo)
+                with open(mode_json_path, "r") as f:
+                    content = json.load(f)
             
             print_info(f"Current mode: {content.get('mode', 'unknown')}")
             
@@ -751,11 +755,19 @@ def modify_partition_mounted(partition_path: Path) -> bool:
             temp_json = WORK_DIR / "mode_temp.json"
             with open(temp_json, "w") as f:
                 json.dump(content, f)
-            
-            run_command(
-                ["cp", str(temp_json), str(mode_json_path)],
-                sudo=True
-            )
+
+            run_command(["cp", str(temp_json), str(mode_json_path)], sudo=True)
+
+            # Restore permissions/ownership if we captured them
+            if perm is not None:
+                run_command(["chmod", perm, str(mode_json_path)], sudo=True, check=False)
+            if uid is not None and gid is not None:
+                run_command(["chown", f"{uid}:{gid}", str(mode_json_path)], sudo=True, check=False)
+
+            try:
+                (WORK_DIR / "mode.json.modified").write_text(json.dumps(content))
+            except Exception:
+                pass
             
             print_success("mode.json modified to 'int-developer'")
             
@@ -779,20 +791,238 @@ def modify_partition_mounted(partition_path: Path) -> bool:
             pass
 
 
+def _find_debugfs_executable() -> Optional[str]:
+    """Find a usable debugfs executable (e2fsprogs)."""
+    for candidate in ("debugfs", "debugfs.exe"):
+        path = shutil.which(candidate)
+        if path:
+            return path
+    return None
+
+
+def modify_partition_debugfs(partition_path: Path) -> bool:
+    """Modify mode.json using debugfs (e2fsprogs) without mounting.
+
+    This can work on Windows if the user has MSYS2 e2fsprogs installed (debugfs.exe on PATH).
+    """
+    debugfs = _find_debugfs_executable()
+    if not debugfs:
+        return False
+
+    print_info("Attempting mode.json edit via debugfs (no mount)...")
+
+    # Potential locations inside /var
+    candidate_paths = [
+        "/jibo/mode.json",
+        "/mode.json",
+        "/etc/jibo/mode.json",
+    ]
+
+    # Find which path exists by trying to cat it
+    existing_path: Optional[str] = None
+    original_text: Optional[str] = None
+    for p in candidate_paths:
+        try:
+            res = run_command(
+                [debugfs, "-R", f"cat {p}", str(partition_path)],
+                capture_output=True,
+                check=True,
+            )
+            # debugfs prints to stdout for cat
+            if res.stdout and "File not found" not in res.stdout:
+                existing_path = p
+                original_text = res.stdout
+                break
+        except Exception:
+            continue
+
+    if not existing_path or original_text is None:
+        print_warning("debugfs could not locate mode.json inside the image")
+        return False
+
+    # Save backup
+    try:
+        (WORK_DIR / "mode.json.original").write_text(original_text)
+    except Exception:
+        pass
+
+    try:
+        content = json.loads(original_text)
+    except Exception:
+        print_warning("mode.json content is not valid JSON; refusing to edit")
+        return False
+
+    content["mode"] = "int-developer"
+    new_text = json.dumps(content)
+
+    temp_json = WORK_DIR / "mode_temp.json"
+    temp_json.write_text(new_text)
+
+    # Overwrite: remove then write to ensure replacement works even if size differs.
+    # This may change filesystem allocation, which is fine for full /var write, and
+    # our patch-write logic can still handle it.
+    try:
+        run_command([debugfs, "-w", "-R", f"rm {existing_path}", str(partition_path)], check=False, capture_output=True)
+        run_command([debugfs, "-w", "-R", f"write {str(temp_json)} {existing_path}", str(partition_path)], capture_output=True)
+    except Exception as e:
+        print_warning(f"debugfs write failed: {e}")
+        return False
+
+    try:
+        (WORK_DIR / "mode.json.modified").write_text(new_text)
+    except Exception:
+        pass
+
+    print_success("mode.json modified to 'int-developer' (debugfs)")
+    return True
+
+
 def modify_var_partition(partition_path: Path) -> bool:
     """Modify the var partition to enable developer mode"""
     print_step(4, 6, "Modifying var partition")
-    
-    # Try direct modification first (works on all platforms)
+
+    # On Linux, prefer mounting: it's the only truly safe way to update a file in an ext filesystem.
+    if platform.system() == "Linux":
+        if modify_partition_mounted(partition_path):
+            return True
+        print_warning("Mount-based edit failed; falling back to raw in-place patch")
+
+    # If mounting is unavailable (Windows/macOS) or failed, try debugfs (ext filesystem edit without mount)
+    if modify_partition_debugfs(partition_path):
+        return True
+
+    # Raw patch is a best-effort last resort
     if modify_mode_json_direct(partition_path):
         return True
     
-    # Fall back to mounting (Linux only)
-    if platform.system() == "Linux":
-        return modify_partition_mounted(partition_path)
-    
     print_error("Could not modify partition")
     return False
+
+
+def emmc_read_to_file(output_path: Path, start_sector: int, num_sectors: int) -> bool:
+    """Read a range of sectors from eMMC into a file."""
+    shofel = get_shofel_path()
+    if not shofel.exists():
+        print_error("shofel2_t124 not found. Please build it first.")
+        return False
+
+    try:
+        cmd = [
+            str(shofel),
+            "EMMC_READ",
+            f"0x{start_sector:x}",
+            f"0x{num_sectors:x}",
+            str(output_path),
+        ]
+        if platform.system() == "Linux":
+            cmd = ["sudo"] + cmd
+        subprocess.run(cmd, cwd=SHOFEL_DIR, check=True)
+        return output_path.exists()
+    except subprocess.CalledProcessError as e:
+        print_error(f"EMMC_READ failed: {e}")
+        return False
+
+
+def emmc_write_file(input_path: Path, start_sector: int) -> bool:
+    """Write a file to eMMC starting at a given sector."""
+    shofel = get_shofel_path()
+    if not shofel.exists():
+        print_error("shofel2_t124 not found. Please build it first.")
+        return False
+
+    try:
+        cmd = [
+            str(shofel),
+            "EMMC_WRITE",
+            f"0x{start_sector:x}",
+            str(input_path),
+        ]
+        if platform.system() == "Linux":
+            cmd = ["sudo"] + cmd
+        subprocess.run(cmd, cwd=SHOFEL_DIR, check=True)
+        return True
+    except subprocess.CalledProcessError as e:
+        print_error(f"EMMC_WRITE failed: {e}")
+        return False
+
+
+def compute_changed_sector_ranges(original_path: Path, modified_path: Path, sector_size: int = 512,
+                                 scan_chunk_bytes: int = 4 * 1024 * 1024) -> Tuple[int, List[Tuple[int, int]]]:
+    """Return (changed_sector_count, ranges) where ranges are (start_sector_offset, num_sectors)."""
+    if original_path.stat().st_size != modified_path.stat().st_size:
+        raise ValueError("Files differ in size; cannot compute sector diffs")
+    total_bytes = original_path.stat().st_size
+    if total_bytes % sector_size != 0:
+        raise ValueError("Partition image size is not a multiple of sector size")
+
+    changed_sectors: List[int] = []
+    scan_chunk_bytes = max(sector_size, (scan_chunk_bytes // sector_size) * sector_size)
+
+    with open(original_path, "rb") as f1, open(modified_path, "rb") as f2:
+        base_sector = 0
+        while True:
+            b1 = f1.read(scan_chunk_bytes)
+            b2 = f2.read(scan_chunk_bytes)
+            if not b1 and not b2:
+                break
+            if b1 == b2:
+                base_sector += len(b1) // sector_size
+                continue
+
+            # Chunk differs; identify sector-level diffs within this chunk
+            sectors_in_chunk = min(len(b1), len(b2)) // sector_size
+            for i in range(sectors_in_chunk):
+                s1 = b1[i * sector_size:(i + 1) * sector_size]
+                s2 = b2[i * sector_size:(i + 1) * sector_size]
+                if s1 != s2:
+                    changed_sectors.append(base_sector + i)
+            base_sector += sectors_in_chunk
+
+    if not changed_sectors:
+        return 0, []
+
+    changed_sectors.sort()
+    ranges: List[Tuple[int, int]] = []
+    start = prev = changed_sectors[0]
+    for s in changed_sectors[1:]:
+        if s == prev + 1:
+            prev = s
+            continue
+        ranges.append((start, prev - start + 1))
+        start = prev = s
+    ranges.append((start, prev - start + 1))
+    return len(changed_sectors), ranges
+
+
+def write_partition_patch_to_emmc(original_path: Path, modified_path: Path, base_start_sector: int,
+                                 max_ranges: int = 128, max_changed_sectors: int = 131072) -> bool:
+    """Write only the changed sectors between two partition images."""
+    try:
+        changed_count, ranges = compute_changed_sector_ranges(original_path, modified_path)
+    except Exception as e:
+        print_warning(f"Patch write unavailable ({e}); falling back to full partition write")
+        return write_partition_to_emmc(modified_path, base_start_sector)
+
+    if changed_count == 0:
+        print_success("No changes detected in /var partition; nothing to write")
+        return True
+
+    if len(ranges) > max_ranges or changed_count > max_changed_sectors:
+        print_warning(f"Too many changes for patch write (ranges={len(ranges)}, sectors={changed_count}); using full /var write")
+        return write_partition_to_emmc(modified_path, base_start_sector)
+
+    print_info(f"Writing patch: {changed_count} sectors across {len(ranges)} ranges")
+
+    sector_size = EMMC_SECTOR_SIZE
+    with open(modified_path, "rb") as src:
+        for idx, (start_off, count) in enumerate(ranges, start=1):
+            patch_path = WORK_DIR / f"var_patch_{idx:03d}.bin"
+            src.seek(start_off * sector_size)
+            payload = src.read(count * sector_size)
+            patch_path.write_bytes(payload)
+            if not emmc_write_file(patch_path, base_start_sector + start_off):
+                return False
+    return True
 
 
 # ============================================================================
@@ -1107,6 +1337,88 @@ def run_write_only(args) -> bool:
     return write_partition_to_emmc(partition_path, args.start_sector)
 
 
+def run_mode_json_only(args) -> bool:
+    """Fast path: dump only GPT + /var, modify /var/jibo/mode.json, and write back minimal changes."""
+    print_banner()
+    print_info("Running in mode-json-only mode (GPT + /var only)")
+
+    WORK_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Build Shofel
+    if not build_shofel(force_rebuild=args.rebuild_shofel):
+        return False
+
+    # Wait for Jibo
+    if not args.skip_detection:
+        if not wait_for_jibo_rcm(timeout=120):
+            return False
+
+    # Dump GPT / partition table (small read)
+    gpt_path = WORK_DIR / "gpt_dump.bin"
+    gpt_sectors = 4096  # 2MB; safely covers typical GPT entry area
+    print_info(f"Dumping GPT header/table ({gpt_sectors} sectors)...")
+    if not emmc_read_to_file(gpt_path, 0, gpt_sectors):
+        return False
+
+    partitions = parse_gpt_partitions(gpt_path)
+    if not partitions:
+        print_error("No partitions found in GPT dump")
+        return False
+
+    var_partition = find_var_partition(partitions)
+    if not var_partition:
+        print_error("Could not identify /var partition from GPT")
+        return False
+
+    print_success(
+        f"Identified /var partition: {var_partition.number} "
+        f"(start=0x{var_partition.start_sector:x}, sectors={var_partition.size_sectors})"
+    )
+
+    # Dump /var partition only
+    original_var_path = WORK_DIR / "var_partition_original.bin"
+    var_partition_path = WORK_DIR / "var_partition.bin"
+    backup_var_path = WORK_DIR / "var_partition_backup.bin"
+
+    print_info("Dumping /var partition only (this is much smaller than a full eMMC dump)...")
+    if not emmc_read_to_file(original_var_path, var_partition.start_sector, var_partition.size_sectors):
+        return False
+
+    shutil.copy(original_var_path, var_partition_path)
+    shutil.copy(original_var_path, backup_var_path)
+    print_info(f"Backup created: {backup_var_path}")
+
+    # Modify mode.json inside /var
+    if not modify_var_partition(var_partition_path):
+        return False
+
+    # Re-check connectivity (optional)
+    if not args.skip_detection:
+        print_info("Please ensure Jibo is still in RCM mode")
+        if not wait_for_jibo_rcm(timeout=60):
+            print_warning("Continuing anyway...")
+
+    # Write back: patch by default, full write if requested
+    if args.full_var_write:
+        print_info("Writing full /var partition back to device...")
+        if not write_partition_to_emmc(var_partition_path, var_partition.start_sector):
+            return False
+    else:
+        print_info("Writing only changed sectors back to device (patch write)...")
+        if not write_partition_patch_to_emmc(original_var_path, var_partition_path, var_partition.start_sector):
+            return False
+
+    # Verify (reads back full /var; optional)
+    if args.verify:
+        if not verify_write(var_partition_path, var_partition.start_sector, var_partition.size_sectors):
+            print_warning("Verification failed, but write may still be successful")
+
+    print(f"\n{Colors.GREEN}{Colors.BOLD}Mode.json update complete!{Colors.RESET}")
+    print_info(f"Saved originals in: {WORK_DIR}")
+    print_info("If Jibo boots to a checkmark, SSH should work.")
+    return True
+
+
 # ============================================================================
 # CLI
 # ============================================================================
@@ -1130,6 +1442,8 @@ Examples:
                            help="Only dump the eMMC without modifying")
     mode_group.add_argument("--write-partition", metavar="FILE",
                            help="Write a partition file to Jibo (requires --start-sector)")
+    mode_group.add_argument("--mode-json-only", action="store_true",
+                           help="Fast mode: dump GPT + /var only, patch /var/jibo/mode.json, write back minimal changes")
     
     # Options
     parser.add_argument("--dump-path", metavar="FILE",
@@ -1148,6 +1462,8 @@ Examples:
                        help="Verify write by reading back (default: True)")
     parser.add_argument("--no-verify", action="store_false", dest="verify",
                        help="Skip write verification")
+    parser.add_argument("--full-var-write", action="store_true", default=False,
+                       help="With --mode-json-only: write entire /var partition instead of patch-writing changed sectors")
     
     args = parser.parse_args()
     
@@ -1162,6 +1478,8 @@ Examples:
         elif args.write_partition:
             args.partition = args.write_partition
             success = run_write_only(args)
+        elif args.mode_json_only:
+            success = run_mode_json_only(args)
         else:
             success = run_full_mod(args)
         
