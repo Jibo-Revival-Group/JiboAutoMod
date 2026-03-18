@@ -58,4 +58,43 @@ fi
 echo "[INFO] Starting Jibo Auto-Mod Tool..."
 echo ""
 
+LAUNCH_MODE="cli"
+
+if [[ -t 0 ]]; then
+    echo "Choose installer mode:"
+    echo "  1) CLI installer (recommended)"
+    echo "  2) GUI installer (experimental - still in progress)"
+    echo ""
+    echo "[RECOMMENDED] CLI mode is currently the most reliable."
+    echo "[WARNING]     GUI mode is still being worked on."
+    echo ""
+    read -r -p "Select [1/2] (default: 1): " choice
+    case "${choice:-1}" in
+        2) LAUNCH_MODE="gui" ;;
+        *) LAUNCH_MODE="cli" ;;
+    esac
+else
+    echo "[INFO] Non-interactive shell detected; defaulting to CLI installer."
+fi
+
+if [[ "$LAUNCH_MODE" == "gui" ]]; then
+    echo ""
+    echo "[WARNING] Launching experimental GUI installer..."
+
+    # Use (or create) a local venv so PySide6 installs cleanly.
+    VENV_PY="$SCRIPT_DIR/.venv/bin/python"
+    if [[ ! -x "$VENV_PY" ]]; then
+        echo "[INFO] Creating virtual environment in .venv ..."
+        python3 -m venv "$SCRIPT_DIR/.venv"
+    fi
+
+    echo "[INFO] Installing GUI dependencies (PySide6 + paramiko)..."
+    "$VENV_PY" -m pip install --upgrade pip >/dev/null
+    "$VENV_PY" -m pip install -r "$SCRIPT_DIR/JiboTools/JiboTools/requirements.txt"
+
+    echo "[INFO] Starting Jibo Tools GUI..."
+    exec "$VENV_PY" "$SCRIPT_DIR/JiboTools/JiboTools/main_panel.py" "$@"
+fi
+
+echo "[INFO] Starting CLI installer..."
 python3 jibo_automod.py "$@"
