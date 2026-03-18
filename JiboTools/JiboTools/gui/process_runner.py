@@ -12,7 +12,24 @@ from typing import Optional
 from PySide6.QtCore import QObject, QProcess, QTimer, Signal, Slot, Property
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+def _find_repo_root(start: Path) -> Path:
+    """Find the outer JiboAutoMod repo root.
+
+    The Qt Creator project lives under JiboTools/JiboTools, while the CLI tools
+    (jibo_updater.py, jibo_automod.py) usually live in the outer repo root.
+    """
+
+    cur = start.resolve()
+    for _ in range(6):
+        if (cur / "jibo_updater.py").exists() and (cur / "jibo_automod.py").exists():
+            return cur
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    return start.resolve().parents[1]
+
+
+REPO_ROOT = _find_repo_root(Path(__file__).resolve())
 
 
 def resolve_python_invocation() -> tuple[str, list[str]]:
@@ -28,13 +45,20 @@ def resolve_python_invocation() -> tuple[str, list[str]]:
     if venv_py.exists():
         return (str(venv_py), [])
 
+    # Prefer the current interpreter when running inside a venv (e.g. Qt Creator).
+    try:
+        if sys.executable and Path(sys.executable).exists():
+            return (sys.executable, [])
+    except Exception:
+        pass
+
     if os.name == "nt" and shutil.which("py"):
         return ("py", ["-3"])
 
     if shutil.which("python3"):
         return ("python3", [])
 
-    return (sys.executable or "python", [])
+    return ("python", [])
 
 
 def resolve_python() -> str:
