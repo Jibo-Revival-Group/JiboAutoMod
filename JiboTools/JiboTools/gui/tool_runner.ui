@@ -98,6 +98,61 @@
       </item>
      </layout>
     </item>
+        <item>
+         <widget class="QLabel" name="descriptionLabel">
+            <property name="text">
+             <string>Tool description</string>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="dumpLayout">
+            <property name="spacing">
+             <number>10</number>
+            </property>
+            <item>
+             <widget class="QCheckBox" name="useExistingDumpCheck">
+                <property name="text">
+                 <string>I already have a full eMMC dump (.bin)</string>
+                </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="dumpPathField">
+                <property name="placeholderText">
+                 <string>Dump path (passed as --dump-path)</string>
+                </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="browseDumpButton">
+                <property name="text">
+                 <string>Browse…</string>
+                </property>
+             </widget>
+            </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QProgressBar" name="progressBar">
+            <property name="value">
+             <number>0</number>
+            </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="currentStepLabel">
+            <property name="text">
+             <string>Idle</string>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+         </widget>
+        </item>
     <item>
      <widget class="QPlainTextEdit" name="logEdit">
       <property name="readOnly">

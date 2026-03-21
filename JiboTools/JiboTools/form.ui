@@ -156,6 +156,32 @@
                  </layout>
                 </widget>
                </item>
+                             <item>
+                                <widget class="QGroupBox" name="groupToolSettings">
+                                 <property name="title">
+                                    <string>Tool Settings</string>
+                                 </property>
+                                 <layout class="QFormLayout" name="formToolSettings">
+                                    <item row="0" column="0">
+                                     <widget class="QLabel" name="labelEnableLogging">
+                                        <property name="text">
+                                         <string>Enable logging</string>
+                                        </property>
+                                     </widget>
+                                    </item>
+                                    <item row="0" column="1">
+                                     <widget class="QCheckBox" name="enableLoggingCheck">
+                                        <property name="text">
+                                         <string/>
+                                        </property>
+                                        <property name="checked">
+                                         <bool>false</bool>
+                                        </property>
+                                     </widget>
+                                    </item>
+                                 </layout>
+                                </widget>
+                             </item>
                <item>
                 <widget class="QGroupBox" name="groupHomeAssistant">
                  <property name="title">
@@ -193,12 +219,12 @@
                  </layout>
                 </widget>
                </item>
-               <item>
-                <widget class="QGroupBox" name="groupAiProvider">
-                 <property name="title">
-                  <string>AI Provider</string>
-                 </property>
-                 <layout class="QFormLayout" name="formAiProvider">
+                      <item>
+                        <widget class="QGroupBox" name="groupAiProvider">
+                         <property name="title">
+                           <string>AI Bridge</string>
+                         </property>
+                         <layout class="QFormLayout" name="formAiProvider">
                   <item row="0" column="0">
                    <widget class="QLabel" name="labelAiEnable">
                     <property name="text">
@@ -216,7 +242,7 @@
                   <item row="1" column="0">
                    <widget class="QLabel" name="labelAiProvider">
                     <property name="text">
-                     <string>Provider</string>
+                               <string>Mode</string>
                     </property>
                    </widget>
                   </item>
@@ -226,7 +252,7 @@
                   <item row="2" column="0">
                    <widget class="QLabel" name="labelAiEndpoint">
                     <property name="text">
-                     <string>API endpoint</string>
+                               <string>Server base URL</string>
                     </property>
                    </widget>
                   </item>
@@ -240,28 +266,245 @@
                   <item row="3" column="0">
                    <widget class="QLabel" name="labelAiKey">
                     <property name="text">
-                     <string>API key</string>
+                               <string>ASR host</string>
                     </property>
                    </widget>
                   </item>
                   <item row="3" column="1">
                    <widget class="QLineEdit" name="aiKeyField">
-                    <property name="echoMode">
-                     <enum>QLineEdit::EchoMode::Password</enum>
+                              <property name="placeholderText">
+                               <string>127.0.0.1</string>
+                              </property>
+                   </widget>
+                  </item>
+                           <item row="4" column="0">
+                            <widget class="QLabel" name="labelAiBridgeRecordSeconds">
+                              <property name="text">
+                               <string>Record seconds</string>
+                              </property>
+                            </widget>
+                           </item>
+                           <item row="4" column="1">
+                            <widget class="QSpinBox" name="aiBridgeRecordSecondsSpin">
+                              <property name="minimum">
+                               <number>1</number>
+                              </property>
+                              <property name="maximum">
+                               <number>60</number>
+                              </property>
+                              <property name="value">
+                               <number>5</number>
+                              </property>
+                            </widget>
+                           </item>
+                           <item row="5" column="0">
+                            <widget class="QLabel" name="labelAiBridgeUseAsr">
+                              <property name="text">
+                               <string>Use ASR service STT</string>
+                              </property>
+                            </widget>
+                           </item>
+                           <item row="5" column="1">
+                            <widget class="QCheckBox" name="aiBridgeUseAsrServiceSttCheck">
+                              <property name="text">
+                               <string/>
+                              </property>
+                              <property name="checked">
+                               <bool>true</bool>
+                              </property>
+                            </widget>
+                           </item>
+                           <item row="6" column="0">
+                            <widget class="QLabel" name="labelAiBridgeAsrPort">
+                              <property name="text">
+                               <string>ASR port</string>
+                              </property>
+                            </widget>
+                           </item>
+                           <item row="6" column="1">
+                            <widget class="QSpinBox" name="aiBridgeAsrPortSpin">
+                              <property name="minimum">
+                               <number>1</number>
+                              </property>
+                              <property name="maximum">
+                               <number>65535</number>
+                              </property>
+                              <property name="value">
+                               <number>8088</number>
+                              </property>
+                            </widget>
+                           </item>
+                           <item row="7" column="0">
+                            <widget class="QLabel" name="labelAiBridgeAsrAudioSource">
+                              <property name="text">
+                               <string>ASR audio source</string>
+                              </property>
+                            </widget>
+                           </item>
+                           <item row="7" column="1">
+                            <widget class="QLineEdit" name="aiBridgeAsrAudioSourceField">
+                              <property name="placeholderText">
+                               <string>alsa1</string>
+                              </property>
+                            </widget>
+                           </item>
+                           <item row="8" column="0">
+                            <widget class="QLabel" name="labelAiBridgeAsrTimeout">
+                              <property name="text">
+                               <string>ASR timeout (ms)</string>
+                              </property>
+                            </widget>
+                           </item>
+                           <item row="8" column="1">
+                            <widget class="QSpinBox" name="aiBridgeAsrTimeoutSpin">
+                              <property name="minimum">
+                               <number>100</number>
+                              </property>
+                              <property name="maximum">
+                               <number>120000</number>
+                              </property>
+                              <property name="singleStep">
+                               <number>100</number>
+                              </property>
+                              <property name="value">
+                               <number>15000</number>
+                              </property>
+                            </widget>
+                           </item>
+                           <item row="9" column="0">
+                            <widget class="QLabel" name="labelAiBridgeAsrAutoStart">
+                              <property name="text">
+                               <string>ASR auto start</string>
+                              </property>
+                            </widget>
+                           </item>
+                           <item row="9" column="1">
+                            <widget class="QCheckBox" name="aiBridgeAsrAutoStartCheck">
+                              <property name="text">
+                               <string/>
+                              </property>
+                              <property name="checked">
+                               <bool>true</bool>
+                              </property>
+                            </widget>
+                           </item>
+                           <item row="10" column="0">
+                            <widget class="QLabel" name="labelAiBridgeFollowupEnabled">
+                              <property name="text">
+                               <string>Followup enabled</string>
+                              </property>
+                            </widget>
+                           </item>
+                           <item row="10" column="1">
+                            <widget class="QCheckBox" name="aiBridgeFollowupEnabledCheck">
+                              <property name="text">
+                               <string/>
+                              </property>
+                              <property name="checked">
+                               <bool>true</bool>
+                              </property>
+                            </widget>
+                           </item>
+                           <item row="11" column="0">
+                            <widget class="QLabel" name="labelAiBridgeFollowupDelay">
+                              <property name="text">
+                               <string>Followup delay (ms)</string>
+                              </property>
+                            </widget>
+                           </item>
+                           <item row="11" column="1">
+                            <widget class="QSpinBox" name="aiBridgeFollowupDelaySpin">
+                              <property name="minimum">
+                               <number>0</number>
+                              </property>
+                              <property name="maximum">
+                               <number>60000</number>
+                              </property>
+                              <property name="singleStep">
+                               <number>50</number>
+                              </property>
+                              <property name="value">
+                               <number>250</number>
+                              </property>
+                            </widget>
+                           </item>
+                           <item row="12" column="0">
+                            <widget class="QLabel" name="labelAiBridge">
+                              <property name="text">
+                               <string>Advanced</string>
+                              </property>
+                            </widget>
+                           </item>
+                           <item row="12" column="1">
+                            <widget class="QPushButton" name="editAiBridgeConfigButton">
+                              <property name="text">
+                               <string>Edit AI Bridge Config</string>
+                              </property>
+                            </widget>
+                           </item>
+                 </layout>
+                </widget>
+               </item>
+               <item>
+                <widget class="QGroupBox" name="groupConfigFiles">
+                 <property name="title">
+                  <string>Config Files</string>
+                 </property>
+                 <layout class="QVBoxLayout" name="configFilesLayout">
+                  <property name="spacing">
+                   <number>8</number>
+                  </property>
+                  <item>
+                   <layout class="QHBoxLayout" name="configFilesTopRow">
+                    <property name="spacing">
+                     <number>8</number>
+                    </property>
+                    <item>
+                     <widget class="QComboBox" name="configFileCombo"/>
+                    </item>
+                    <item>
+                     <widget class="QPushButton" name="configReadButton">
+                      <property name="text">
+                       <string>Read</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QPushButton" name="configWriteButton">
+                      <property name="enabled">
+                       <bool>false</bool>
+                      </property>
+                      <property name="text">
+                       <string>Write</string>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="configFileStatusLabel">
+                    <property name="text">
+                     <string>Select a config to view/edit</string>
+                    </property>
+                    <property name="wordWrap">
+                     <bool>true</bool>
                     </property>
                    </widget>
                   </item>
-                  <item row="4" column="0">
-                   <widget class="QLabel" name="labelTokens">
+                  <item>
+                   <widget class="QPlainTextEdit" name="configEditor"/>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="configLogLabel">
                     <property name="text">
-                     <string>Tokens used</string>
+                     <string>Activity log</string>
                     </property>
                    </widget>
                   </item>
-                  <item row="4" column="1">
-                   <widget class="QLabel" name="tokensUsedLabel">
-                    <property name="text">
-                     <string>-1</string>
+                  <item>
+                   <widget class="QPlainTextEdit" name="configActivityLog">
+                    <property name="readOnly">
+                     <bool>true</bool>
                     </property>
                    </widget>
                   </item>
