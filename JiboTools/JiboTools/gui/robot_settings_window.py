@@ -44,13 +44,11 @@ class RobotSettingsWindow:
         splitter = QSplitter(Qt.Horizontal)
         outer.addWidget(splitter, 1)
 
-        # Left: tree
         self.tree = QTreeWidget()
         self.tree.setHeaderHidden(True)
         self.tree.setSelectionMode(QAbstractItemView.SingleSelection)
         splitter.addWidget(self.tree)
 
-        # Right: editor + buttons + log
         right = QWidget()
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
@@ -168,7 +166,6 @@ class RobotSettingsWindow:
 
     @Slot()
     def _on_editor_changed(self) -> None:
-        # Enable write only if we have a loaded file and text changed.
         if not self._current_remote_path or self._last_read_text is None:
             self.write_button.setEnabled(False)
             return
@@ -243,14 +240,12 @@ class RobotSettingsWindow:
 
         new_text_raw = self.editor.toPlainText()
 
-        # Validate JSON if possible; this tool is focused on strict JSON configs.
         try:
             new_obj = json.loads(new_text_raw)
         except Exception as e:
             QMessageBox.warning(self.window, "Invalid JSON", f"JSON parse failed: {e}")
             return
 
-        # Canonicalize to keep robot-side JSON strict/clean.
         new_text = json.dumps(new_obj, indent=2, ensure_ascii=False) + "\n"
 
         try:
@@ -264,7 +259,6 @@ class RobotSettingsWindow:
         except Exception:
             old_obj = MISSING
 
-        # Mounted dir special case: /usr/local/* is often read-only until remount.
         if remote_path.startswith("/usr/local/"):
             cmd = "mount -o remount,rw /usr/local"
             self._log(f"EXEC {cmd}")
@@ -280,7 +274,6 @@ class RobotSettingsWindow:
             if out.strip():
                 self._log(out.strip())
 
-        # Compute diffs (best-effort).
         if old_obj is not MISSING:
             diffs = diff_json(old_obj, new_obj)
             if diffs:
@@ -302,7 +295,6 @@ class RobotSettingsWindow:
         try:
             self._sftp_write_text(remote_path, new_text)
             self._log(f"WROTE {remote_path} ({len(new_text)} bytes)")
-            # Refresh read baseline.
             self.editor.setPlainText(new_text)
             self._last_read_text = new_text
             self.write_button.setEnabled(False)

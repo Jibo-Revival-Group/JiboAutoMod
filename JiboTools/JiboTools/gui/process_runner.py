@@ -45,7 +45,6 @@ def resolve_python_invocation() -> tuple[str, list[str]]:
     if venv_py.exists():
         return (str(venv_py), [])
 
-    # Prefer the current interpreter when running inside a venv (e.g. Qt Creator).
     try:
         if sys.executable and Path(sys.executable).exists():
             return (sys.executable, [])
@@ -64,7 +63,6 @@ def resolve_python_invocation() -> tuple[str, list[str]]:
 def resolve_python() -> str:
     program, prefix = resolve_python_invocation()
     if prefix:
-        # Best-effort string representation (mostly for display)
         return " ".join([program] + prefix)
     return program
 
@@ -82,7 +80,6 @@ def _pick_terminal_command() -> Optional[list[str]]:
         return None
 
     candidates: list[list[str]] = []
-    # Debian/Ubuntu alternative system
     candidates.append(["x-terminal-emulator", "-e"])
     candidates.append(["gnome-terminal", "--"])
     candidates.append(["konsole", "-e"])
@@ -102,8 +99,6 @@ def spawn_in_terminal(argv: list[str]) -> bool:
     """
 
     if os.name == "nt":
-        # Use cmd.exe window, keep it open (/k)
-        # Build a single string command for cmd.
         cmdline = " ".join(shlex.quote(a) for a in argv)
         subprocess.Popen(["cmd", "/c", "start", "cmd", "/k", cmdline], shell=False)
         return True

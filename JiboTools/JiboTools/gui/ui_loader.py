@@ -27,7 +27,6 @@ def load_ui(ui_path: Path) -> object:
 
 
 def require_child(parent: object, name: str, typ: type[T]) -> T:
-    # Qt objects implement findChild; keep typing light.
     child = parent.findChild(typ, name)  # type: ignore[attr-defined]
     if child is None:
         raise RuntimeError(f"UI is missing required widget '{name}' ({typ.__name__})")

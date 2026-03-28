@@ -67,13 +67,11 @@ def load_config_entries_from_values_md() -> list[ConfigEntry]:
         if path in seen:
             continue
 
-        # Filter out non-robot/server dev configs the user doesn't want here.
         if path.startswith("/hub-shim/"):
             continue
         if path.lower().endswith(".md"):
             continue
 
-        # Keep it focused on JSON files (these are strict JSON configs).
         if not path.lower().endswith(".json"):
             continue
 

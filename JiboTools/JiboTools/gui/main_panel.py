@@ -50,12 +50,10 @@ class MainWindowController:
         self._identity: Optional[dict] = None
         self._connecting = False
 
-        # Tabs + connection pill
         self.tab_widget = require_child(self.window, "tabWidget", QTabWidget)
         self.connection_pill, self.conn_dot, self.conn_text = self._create_connection_pill()
         self.tab_widget.setCornerWidget(self.connection_pill, Qt.TopRightCorner)
 
-        # Jibo/config
         self.jibo_ip = require_child(self.window, "JiboIpField", QLineEdit)
         self.connect_button = require_child(self.window, "TryToConnect", QPushButton)
         self.jibo_title = require_child(self.window, "jiboTitle", QLabel)
@@ -65,7 +63,6 @@ class MainWindowController:
         self.ha_enable = require_child(self.window, "haEnableCheck", QCheckBox)
         self.ha_server_ip = require_child(self.window, "haServerIpField", QLineEdit)
 
-        # AI Bridge (formerly "AI Provider")
         self.ai_enable = require_child(self.window, "aiEnableCheck", QCheckBox)
         self.ai_mode = require_child(self.window, "aiProviderCombo", QComboBox)
         self.ai_server_base_url = require_child(self.window, "aiEndpointField", QLineEdit)
@@ -82,10 +79,8 @@ class MainWindowController:
 
         self._ai_bridge_obj: Optional[dict[str, Any]] = None
 
-        # Tool settings
         self.enable_logging_check = require_child(self.window, "enableLoggingCheck", QCheckBox)
 
-        # Config editor (main panel "Config" section)
         self.config_file_combo = require_child(self.window, "configFileCombo", QComboBox)
         self.config_read_button = require_child(self.window, "configReadButton", QPushButton)
         self.config_write_button = require_child(self.window, "configWriteButton", QPushButton)
@@ -96,18 +91,15 @@ class MainWindowController:
         self._config_last_read_text: Optional[str] = None
         self._config_paths: list[str] = []
 
-        # Jibo card controls
         self.robot_settings_button = require_child(self.window, "RobotSettings", QPushButton)
         self.robot_action_combo = require_child(self.window, "comboBox", QComboBox)
         self.jibo_image = require_child(self.window, "jiboImage", QLabel)
 
         self._robot_settings_window: Optional[object] = None
 
-        # Update page
         self.install_button = require_child(self.window, "installButton", QPushButton)
         self.check_updates_button = require_child(self.window, "checkUpdatesButton", QPushButton)
 
-        # Status page
         self.status_dot = require_child(self.window, "statusDot", QLabel)
         self.status_text = require_child(self.window, "statusText", QLabel)
 
@@ -137,7 +129,6 @@ class MainWindowController:
         return self.session_connected
 
     def _configure_ui(self) -> None:
-        # Simple styling, roughly matching the previous QML look.
         self.connection_pill.setStyleSheet(
             "QFrame#connectionPill {"
             "background-color: #f6f6f6;"
@@ -146,22 +137,18 @@ class MainWindowController:
             "}"
         )
 
-        # AI Bridge mode choices
         self.ai_mode.clear()
         self.ai_mode.addItems(["TEXT", "AUDIO"])
 
-        # Robot controls start disabled until connected.
         self.robot_settings_button.setEnabled(False)
         self.robot_action_combo.setEnabled(False)
 
-        # Config editor defaults
         self.config_editor.setPlaceholderText("Select a config file, then Read")
         self.config_activity_log.setReadOnly(True)
         self.config_activity_log.setPlaceholderText("Logging is disabled")
         self.config_read_button.setEnabled(False)
         self.config_write_button.setEnabled(False)
 
-        # Defaults
         self.connect_button.setText("Connect")
         self.jibo_title.setText("Connect Your Jibo")
 
@@ -179,7 +166,6 @@ class MainWindowController:
 
         self.edit_ai_bridge_button.clicked.connect(self._jump_to_ai_bridge_config)
 
-        # Keep AI Bridge in-memory config in sync with UI edits.
         self.ai_enable.toggled.connect(self._sync_ai_bridge_obj_from_ui)
         self.ai_mode.currentIndexChanged.connect(self._sync_ai_bridge_obj_from_ui)
         self.ai_server_base_url.textChanged.connect(self._sync_ai_bridge_obj_from_ui)
@@ -218,7 +204,6 @@ class MainWindowController:
                 ssh_client=self._ssh_client,
                 logging_enabled_check=self.enable_logging_check,
             )
-        # Refresh the SSH client reference in case we reconnected.
         try:
             self._robot_settings_window.set_ssh_client(self._ssh_client)  # type: ignore[attr-defined]
         except Exception:
@@ -245,12 +230,10 @@ class MainWindowController:
         self.ai_followup_enabled.setEnabled(ai_enabled)
         self.ai_followup_delay_ms.setEnabled(ai_enabled)
 
-        # Connection button enabled unless a connect attempt is in progress.
         self.connect_button.setEnabled(not self._connecting)
 
         connected = self.session_connected
         self.config_read_button.setEnabled(connected and self.config_file_combo.count() > 0)
-        # write button is controlled by editor dirty state
 
     def _sync_all(self) -> None:
         host = self.host
@@ -285,7 +268,6 @@ class MainWindowController:
         else:
             self.status_text.setText("No Jibo IP configured")
 
-        # Image swap
         assets = Path(__file__).resolve().parent / "Assets" / "Jibo"
         img_path = assets / ("JiboFaceForward.png" if visual_connected else "NoJiboConnected.png")
         pm = QPixmap(str(img_path))
@@ -340,7 +322,6 @@ class MainWindowController:
         self.config_activity_log.appendPlainText(message)
 
     def _populate_config_file_combo(self) -> None:
-        # Populate from inventory, excluding /usr/local/etc (those belong under Robot Settings)
         entries = load_config_entries_from_values_md()
         paths = [e.remote_path for e in entries if not e.is_usr_local_etc]
         paths = sorted(paths)
@@ -369,8 +350,6 @@ class MainWindowController:
             self.config_file_combo.setCurrentIndex(idx)
             self._read_selected_config()
 
-            # Seed editor with the current AI Bridge UI state so the user can
-            # immediately press Write.
             try:
                 merged = self._merged_ai_bridge_obj_from_ui()
                 desired_text = json.dumps(merged, indent=2, ensure_ascii=False) + "\n"
@@ -539,7 +518,6 @@ class MainWindowController:
         return base
 
     def _sync_ai_bridge_obj_from_ui(self, *_args: Any) -> None:
-        # Keep unknown keys (if any) from the on-robot JSON.
         try:
             self._ai_bridge_obj = self._merged_ai_bridge_obj_from_ui()
         except Exception:
@@ -577,7 +555,6 @@ class MainWindowController:
         except Exception:
             old_obj = MISSING
 
-        # Safety: if a /usr/local path ever ends up here, handle remount.
         if p.startswith("/usr/local/"):
             cmd = "mount -o remount,rw /usr/local"
             self._log(f"EXEC {cmd}")
@@ -666,12 +643,10 @@ class MainWindowController:
 
             identity = json.loads(raw_text)
 
-            # Success: store session.
             self._ssh_client = client
             self._identity = identity if isinstance(identity, dict) else None
             self.status_text.setText(f"Connected via SSH to {host}")
 
-            # Auto-populate AI Bridge section when connected.
             try:
                 self._load_ai_bridge_from_robot()
             except Exception:
@@ -705,7 +680,6 @@ class MainWindowController:
         layout.addWidget(dot)
         layout.addWidget(text)
 
-        # Keep it tight on the tab bar.
         pill.setSizePolicy(pill.sizePolicy().horizontalPolicy(), pill.sizePolicy().verticalPolicy())
         pill.setMinimumHeight(28)
         return pill, dot, text

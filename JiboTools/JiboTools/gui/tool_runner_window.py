@@ -63,7 +63,6 @@ class ToolRunnerWindow(QObject):
 
         self._host_field.setVisible(self._is_updater)
 
-        # Installer-specific UX
         self._use_existing_dump.setVisible(self._is_installer)
         self._dump_path.setVisible(self._is_installer)
         self._browse_dump.setVisible(self._is_installer)
@@ -108,7 +107,6 @@ class ToolRunnerWindow(QObject):
         self._sync_buttons()
         self._sync_status()
 
-        # Ensure the process is stopped when the window closes.
         self.window.closeEvent = self._on_close  # type: ignore[assignment]
 
     def show(self) -> None:
@@ -125,7 +123,6 @@ class ToolRunnerWindow(QObject):
         extra = self._extra_args.text().strip()
         extra_args: list[str] = shlex.split(extra) if extra else []
 
-        # Installer convenience: if the user has an existing dump, pass it via --dump-path
         if self._is_installer and self._use_existing_dump.isChecked():
             dump_path = self._dump_path.text().strip()
             if dump_path and "--dump-path" not in extra_args:
@@ -150,7 +147,6 @@ class ToolRunnerWindow(QObject):
                     self._status.setText("Dump file not found")
                     return
 
-            # Reset progress state for a new run.
             self._output_buffer = ""
             self._last_step_total = None
             if self._is_installer:
@@ -168,7 +164,6 @@ class ToolRunnerWindow(QObject):
 
     @Slot(str)
     def _append_output(self, chunk: str) -> None:
-        # Keep it simple: append and scroll to end.
         self._log.moveCursor(QTextCursor.End)
         self._log.insertPlainText(chunk)
         self._log.moveCursor(QTextCursor.End)
@@ -181,7 +176,6 @@ class ToolRunnerWindow(QObject):
         self._start_stop.setText("Stop" if running else "Start")
         self._open_terminal.setEnabled(not running)
         if not running and self._is_installer:
-            # Leave progress/status in a meaningful final state.
             if self.runner.exitCode == 0 and self._last_step_total:
                 self._progress.setRange(0, self._last_step_total)
                 self._progress.setValue(self._last_step_total)
@@ -194,7 +188,6 @@ class ToolRunnerWindow(QObject):
     def _sync_status(self) -> None:
         if self.runner.running:
             self._status.setText("Running...")
-            # Indeterminate until we see a structured step marker.
             if self._is_installer and self._last_step_total is None:
                 self._progress.setRange(0, 0)
             return
@@ -233,7 +226,6 @@ class ToolRunnerWindow(QObject):
         self._output_buffer += chunk
         lines = self._output_buffer.splitlines(keepends=True)
 
-        # Keep any partial line for the next chunk.
         if lines and not (lines[-1].endswith("\n") or lines[-1].endswith("\r")):
             self._output_buffer = lines[-1]
             lines = lines[:-1]
@@ -245,7 +237,6 @@ class ToolRunnerWindow(QObject):
             if not clean:
                 continue
 
-            # Also surface meaningful non-step status lines (RCM detection, warnings, etc.)
             if clean.startswith(("ℹ", "⚠", "✓", "✗")) or "RCM" in clean:
                 msg = _clean_status_line(clean)
                 if msg and not msg.startswith("["):
@@ -258,7 +249,6 @@ class ToolRunnerWindow(QObject):
             total = int(m.group(2))
             msg = m.group(3).strip()
 
-            # Some flows use [0/6] for dependency checks.
             if total > 0:
                 self._last_step_total = total
                 self._progress.setRange(0, total)
@@ -284,9 +274,7 @@ def _strip_ansi(s: str) -> str:
 
 
 def _clean_status_line(s: str) -> str:
-    # Drop leading glyphs used by the CLI (info/warn/success/error)
     s = re.sub(r"^[✓⚠✗ℹ]\s+", "", s).strip()
-    # Collapse extra whitespace
     s = re.sub(r"\s+", " ", s).strip()
     return s
 

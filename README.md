@@ -398,6 +398,41 @@ Returning to normal mode
 After update, set /var/jibo/mode.json back to normal (no prompt).
 --no-return-normal
 
+## Updater: Interactive TUI and GUI integration
+
+The bundled `jibo_updater.py` now supports a simple interactive text UI and a small programmatic interface intended for later GUI integration.
+
+- `--tui`: Launch a brief interactive text UI to pick a distribution host and release, or select a local archive under `jibo_work/updates/downloads/`.
+- `--distributors <path>`: Use `Distributors.json` (default) to get a list of release hosts to probe for latency and releases.
+
+Standalone TUI helper
+---------------------
+
+If you want a more polished terminal UI, use the new `jibo_updater_tui.py` curses-based helper. It provides
+keyboard navigation and prints a JSON selection to stdout suitable for piping into other scripts.
+
+Usage:
+
+```bash
+python3 jibo_updater_tui.py --distributors Distributors.json
+```
+
+The TUI outputs a JSON object describing the selected host and release, for example:
+
+```json
+{"host": "https://code.zane.org/..", "source":"remote", "tag":"v3.3.0", "tarball_url":"https://..."}
+```
+
+Behavior notes:
+- The TUI will probe hosts listed in `Distributors.json` and present latency and available releases.
+- Local archives found in `jibo_work/updates/downloads/` are shown as a "local" source and can be chosen without downloading.
+- When updating, uploaded files and directories are set to permissive `0777` to avoid boot failures caused by missing execute/read permissions.
+
+GUI integration:
+- `jibo_updater.py` includes a simple programmatic surface (CLI flags and a small interactive mode) designed so a GUI can call it or be wired to a future HTTP/JSON control API. For now, use `--tui` to exercise the flow; GUI hooks will be documented in `CHECKLIST.md` for the next steps.
+
+Dependencies: no additional Python packages were added for this change (uses standard library + `paramiko` already required). If you use the GUI in future, update `requirements-gui.txt` accordingly.
+
 Never prompt and never change mode back.
 Examples
 Update to latest:

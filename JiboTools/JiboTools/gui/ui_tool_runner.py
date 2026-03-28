@@ -1,12 +1,5 @@
 # -*- coding: utf-8 -*-
 
-################################################################################
-## Form generated from reading UI file 'tool_runner.ui'
-##
-## Created by: Qt User Interface Compiler version 6.10.2
-##
-## WARNING! All changes made in this file will be lost when recompiling UI file!
-################################################################################
 
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
     QMetaObject, QObject, QPoint, QRect,
@@ -149,7 +142,6 @@ class Ui_ToolRunnerWindow(object):
         self.retranslateUi(ToolRunnerWindow)
 
         QMetaObject.connectSlotsByName(ToolRunnerWindow)
-    # setupUi
 
     def retranslateUi(self, ToolRunnerWindow):
         ToolRunnerWindow.setWindowTitle(QCoreApplication.translate("ToolRunnerWindow", u"Tool", None))
@@ -165,5 +157,4 @@ class Ui_ToolRunnerWindow(object):
         self.currentStepLabel.setText(QCoreApplication.translate("ToolRunnerWindow", u"Idle", None))
         self.statusLabel.setText(QCoreApplication.translate("ToolRunnerWindow", u"Idle", None))
         self.clearLogButton.setText(QCoreApplication.translate("ToolRunnerWindow", u"Clear log", None))
-    # retranslateUi
 

@@ -1,12 +1,5 @@
 # -*- coding: utf-8 -*-
 
-################################################################################
-## Form generated from reading UI file 'form.ui'
-##
-## Created by: Qt User Interface Compiler version 6.10.2
-##
-## WARNING! All changes made in this file will be lost when recompiling UI file!
-################################################################################
 
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
     QMetaObject, QObject, QPoint, QRect,
@@ -557,7 +550,6 @@ class Ui_MainWindow(object):
 
 
         QMetaObject.connectSlotsByName(MainWindow)
-    # setupUi
 
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"Jibo Tools", None))
@@ -627,5 +619,4 @@ class Ui_MainWindow(object):
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tabStatus), QCoreApplication.translate("MainWindow", u"Status", None))
         self.robotOsComingSoon.setText(QCoreApplication.translate("MainWindow", u"Coming soon.", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tabRobotOs), QCoreApplication.translate("MainWindow", u"Robot OS", None))
-    # retranslateUi
 

@@ -24,19 +24,14 @@ from pathlib import Path
 from typing import Optional, Tuple, List
 from dataclasses import dataclass
 
-# ============================================================================
-# Configuration
-# ============================================================================
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
 SHOFEL_DIR = SCRIPT_DIR / "Shofel"
 WORK_DIR = SCRIPT_DIR / "jibo_work"
 
-# eMMC dump parameters
 EMMC_TOTAL_SECTORS = 0x1D60000  # Total sectors to dump (~15GB)
 EMMC_SECTOR_SIZE = 512
 
-# Colors for terminal output
 class Colors:
     RED = '\033[91m'
     GREEN = '\033[92m'
@@ -47,7 +42,6 @@ class Colors:
     RESET = '\033[0m'
     BOLD = '\033[1m'
 
-# Disable colors on Windows unless using Windows Terminal
 if platform.system() == "Windows" and "WT_SESSION" not in os.environ:
     for attr in dir(Colors):
         if not attr.startswith('_'):
@@ -64,9 +58,6 @@ class PartitionInfo:
     name: str
 
 
-# ============================================================================
-# Utilities
-# ============================================================================
 
 def print_banner():
     """Print the tool banner"""
@@ -151,22 +142,17 @@ def _check_payloads_exist() -> bool:
     return all((SHOFEL_DIR / p).exists() for p in critical_payloads)
 
 
-# ============================================================================
-# Dependency Checking
-# ============================================================================
 
 def check_linux_dependencies() -> Tuple[bool, List[str], List[str]]:
     """Check for required Linux dependencies"""
     missing = []
     warnings = []
     
-    # Required tools for host build
     required_tools = {
         "gcc": "build-essential or base-devel",
         "make": "build-essential or base-devel",
     }
     
-    # Optional tools (have fallbacks)
     optional_tools = {
         "lsusb": "usbutils (optional, used for device detection)",
         "fdisk": "util-linux (optional, has Python fallback)",
@@ -180,12 +166,10 @@ def check_linux_dependencies() -> Tuple[bool, List[str], List[str]]:
         if not shutil.which(tool):
             warnings.append(f"{tool} ({package})")
     
-    # Check ARM toolchain only if payloads are missing
     if not _check_payloads_exist():
         if not shutil.which("arm-none-eabi-gcc"):
             missing.append("arm-none-eabi-gcc (arm-none-eabi-gcc or arm-none-eabi-toolchain)")
     
-    # Check for libusb
     try:
         result = subprocess.run(
             ["pkg-config", "--exists", "libusb-1.0"],
@@ -194,7 +178,6 @@ def check_linux_dependencies() -> Tuple[bool, List[str], List[str]]:
         if result.returncode != 0:
             missing.append("libusb-1.0-dev or libusb1-devel")
     except FileNotFoundError:
-        # pkg-config not found, try alternative check
         if not Path("/usr/include/libusb-1.0").exists() and \
            not Path("/usr/local/include/libusb-1.0").exists():
             missing.append("libusb-1.0-dev or libusb1-devel")
@@ -207,20 +190,16 @@ def check_windows_dependencies() -> Tuple[bool, List[str], List[str]]:
     missing = []
     warnings = []
     
-    # Check for MinGW or MSYS2
     if not shutil.which("gcc") and not shutil.which("x86_64-w64-mingw32-gcc"):
         missing.append("MinGW-w64 or MSYS2")
     
-    # Check for ARM toolchain only if payloads missing
     if not _check_payloads_exist():
         if not shutil.which("arm-none-eabi-gcc"):
             missing.append("ARM GNU Toolchain (arm-none-eabi-gcc)")
     
-    # Check for make
     if not shutil.which("make") and not shutil.which("mingw32-make"):
         missing.append("GNU Make")
 
-    # Optional: debugfs for editing ext filesystem images without mounting
     if not shutil.which("debugfs") and not shutil.which("debugfs.exe"):
         warnings.append("debugfs (e2fsprogs) - optional but recommended for reliable mode.json edits on Windows")
     
@@ -243,7 +222,6 @@ def print_install_instructions(system: str, missing: List[str], warnings: List[s
         print(f"\n{Colors.BOLD}Installation instructions:{Colors.RESET}")
     
         if system == "Linux":
-            # Detect distro
             distro = "unknown"
             if Path("/etc/arch-release").exists():
                 distro = "arch"
@@ -289,9 +267,6 @@ def print_install_instructions(system: str, missing: List[str], warnings: List[s
 """)
 
 
-# ============================================================================
-# Shofel Building
-# ============================================================================
 
 def check_shofel_built() -> bool:
     """Check if shofel2_t124 is already built"""
@@ -333,18 +308,14 @@ def build_shofel(force_rebuild: bool = False) -> bool:
     print_info("Compiling shofel2_t124...")
     
     try:
-        # Only clean host build (preserves payload .bin files)
         if force_rebuild:
             run_command(["make", "clean"], cwd=SHOFEL_DIR, capture_output=True, check=False)
         
-        # Build (Makefile will skip existing payload .bin files)
         result = run_command(["make"], cwd=SHOFEL_DIR, capture_output=True, check=False)
         
-        # Check if the main executable was built
         if check_shofel_built():
             print_success("Host tool (shofel2_t124) built successfully!")
             
-            # Check payloads again
             payloads_ok, missing_payloads = check_payloads_built()
             if not payloads_ok:
                 print_error("ARM payload binaries are missing!")
@@ -353,7 +324,6 @@ def build_shofel(force_rebuild: bool = False) -> bool:
                 print(f"{Colors.YELLOW}The ARM toolchain (arm-none-eabi-gcc) is required to build payloads.{Colors.RESET}")
                 print()
                 
-                # Detect distro and provide instructions
                 if Path("/etc/arch-release").exists():
                     print(f"  {Colors.CYAN}Arch/CachyOS:{Colors.RESET} sudo pacman -S arm-none-eabi-gcc arm-none-eabi-newlib")
                 elif Path("/etc/debian_version").exists():
@@ -381,20 +351,15 @@ def build_shofel(force_rebuild: bool = False) -> bool:
         return False
 
 
-# ============================================================================
-# Jibo Detection
-# ============================================================================
 
 def detect_jibo_rcm() -> bool:
     """Detect if Jibo is connected in RCM mode"""
     print_info("Looking for Jibo in RCM mode (NVIDIA APX device)...")
     
     if platform.system() == "Linux":
-        # Try lsusb first
         if shutil.which("lsusb"):
             try:
                 result = run_command(["lsusb"], capture_output=True)
-                # Jibo uses 0955:7740 (NVIDIA APX)
                 if "0955:7740" in result.stdout:
                     print_success("Found Jibo in RCM mode!")
                     return True
@@ -408,7 +373,6 @@ def detect_jibo_rcm() -> bool:
             except Exception as e:
                 print_error(f"lsusb failed: {e}")
         
-        # Fallback: check /sys/bus/usb/devices
         try:
             usb_devices = Path("/sys/bus/usb/devices")
             if usb_devices.exists():
@@ -424,16 +388,13 @@ def detect_jibo_rcm() -> bool:
         except Exception:
             pass
         
-        # Final fallback: assume user will connect it
         print_warning("Cannot detect USB devices. Please ensure Jibo is in RCM mode.")
         print_info("The tool will attempt to connect anyway.")
         return True  # Let shofel try
     
     elif platform.system() == "Windows":
-        # On Windows, we need to use different methods
         print_warning("Windows USB detection - please ensure Zadig drivers are installed")
         print_info("Run Zadig and install WinUSB driver for 'APX' device")
-        # Try to proceed anyway, shofel will detect it
         return True
     
     return False
@@ -459,36 +420,25 @@ def wait_for_jibo_rcm(timeout: int = 60) -> bool:
     return False
 
 
-# ============================================================================
-# GPT Partition Parsing
-# ============================================================================
 
 def parse_gpt_partitions(dump_path: Path) -> List[PartitionInfo]:
     """Parse GPT partition table from dump file"""
     partitions = []
     
     with open(dump_path, "rb") as f:
-        # Read MBR (sector 0) - skip it
         f.seek(512)
         
-        # Read GPT header (sector 1)
         gpt_header = f.read(512)
         
-        # Check GPT signature
         signature = gpt_header[:8]
         if signature != b'EFI PART':
             print_warning("GPT signature not found, trying fdisk parsing...")
             return parse_partitions_fdisk(dump_path)
         
-        # Parse GPT header
-        # Offset 72: Partition entries start LBA (8 bytes)
-        # Offset 80: Number of partition entries (4 bytes)
-        # Offset 84: Size of partition entry (4 bytes)
         partition_entries_lba = struct.unpack("<Q", gpt_header[72:80])[0]
         num_entries = struct.unpack("<I", gpt_header[80:84])[0]
         entry_size = struct.unpack("<I", gpt_header[84:88])[0]
         
-        # Seek to partition entries
         f.seek(partition_entries_lba * 512)
         
         for i in range(num_entries):
@@ -496,11 +446,6 @@ def parse_gpt_partitions(dump_path: Path) -> List[PartitionInfo]:
             if len(entry) < 128:
                 break
             
-            # Parse partition entry
-            # Offset 0: Partition type GUID (16 bytes)
-            # Offset 32: First LBA (8 bytes)
-            # Offset 40: Last LBA (8 bytes)
-            # Offset 56: Partition name (72 bytes, UTF-16LE)
             
             type_guid = entry[:16]
             if type_guid == b'\x00' * 16:
@@ -509,7 +454,6 @@ def parse_gpt_partitions(dump_path: Path) -> List[PartitionInfo]:
             first_lba = struct.unpack("<Q", entry[32:40])[0]
             last_lba = struct.unpack("<Q", entry[40:48])[0]
             
-            # Parse name (UTF-16LE, null-terminated)
             name_bytes = entry[56:128]
             try:
                 name = name_bytes.decode('utf-16le').rstrip('\x00')
@@ -538,14 +482,11 @@ def parse_partitions_fdisk(dump_path: Path) -> List[PartitionInfo]:
             check=False
         )
         
-        # Parse fdisk output
         for line in result.stdout.split('\n'):
-            # Look for lines like: dump.bin1      34  2048033  2048000 1000M Microsoft basic data
             if dump_path.name in line and not line.startswith("Disk"):
                 parts = line.split()
                 if len(parts) >= 4:
                     try:
-                        # Extract partition number from name (e.g., dump.bin5 -> 5)
                         part_name = parts[0]
                         part_num = int(''.join(c for c in part_name if c.isdigit()) or '0')
                         
@@ -570,15 +511,12 @@ def parse_partitions_fdisk(dump_path: Path) -> List[PartitionInfo]:
 
 def find_var_partition(partitions: List[PartitionInfo]) -> Optional[PartitionInfo]:
     """Find the /var partition (partition 5, ~500MB)"""
-    # The var partition is typically partition 5 with ~500MB size
     for part in partitions:
         if part.number == 5:
-            # Verify it's roughly the right size (450-550 MB)
             size_mb = (part.size_sectors * EMMC_SECTOR_SIZE) / (1024 * 1024)
             if 400 < size_mb < 600:
                 return part
     
-    # Fallback: look for any ~500MB partition
     for part in partitions:
         size_mb = (part.size_sectors * EMMC_SECTOR_SIZE) / (1024 * 1024)
         if 450 < size_mb < 550:
@@ -588,9 +526,6 @@ def find_var_partition(partitions: List[PartitionInfo]) -> Optional[PartitionInf
     return None
 
 
-# ============================================================================
-# Partition Extraction and Modification
-# ============================================================================
 
 def extract_partition(dump_path: Path, partition: PartitionInfo, output_path: Path) -> bool:
     """Extract a partition from the dump"""
@@ -626,8 +561,6 @@ def modify_mode_json_direct(partition_path: Path) -> bool:
         with open(partition_path, "r+b") as f:
             data = bytearray(f.read())
 
-            # Best-effort raw replacement.
-            # IMPORTANT: never change image length and never shift bytes; only overwrite in-place.
             json_patterns = [
                 (b'{"mode":"normal"}', b'{"mode":"int-developer"}'),
                 (b'{"mode": "normal"}', b'{"mode": "int-developer"}'),
@@ -654,7 +587,6 @@ def modify_mode_json_direct(partition_path: Path) -> bool:
                         return False
 
                     region_len = len(new_json)
-                    # Overwrite the JSON plus the padding region; do NOT shift bytes.
                     data[offset:offset + region_len] = new_json
 
                 f.seek(0)
@@ -680,18 +612,15 @@ def modify_partition_mounted(partition_path: Path) -> bool:
     mount_point.mkdir(parents=True, exist_ok=True)
     
     try:
-        # Mount the partition
         print_info(f"Mounting partition at {mount_point}...")
         run_command(
             ["mount", "-o", "loop", str(partition_path), str(mount_point)],
             sudo=True
         )
         
-        # Find and modify mode.json
         mode_json_path = mount_point / "jibo" / "mode.json"
         
         if not mode_json_path.exists():
-            # Try alternative paths
             for alt_path in [
                 mount_point / "mode.json",
                 mount_point / "etc" / "jibo" / "mode.json",
@@ -703,7 +632,6 @@ def modify_partition_mounted(partition_path: Path) -> bool:
         if mode_json_path.exists():
             print_info(f"Found mode.json at {mode_json_path}")
 
-            # Capture original permissions/ownership so we can restore after copy-write
             perm = None
             uid = None
             gid = None
@@ -720,7 +648,6 @@ def modify_partition_mounted(partition_path: Path) -> bool:
             except Exception:
                 pass
 
-            # Save a raw backup copy of mode.json for debugging/recovery
             try:
                 backup_text = run_command(
                     ["cat", str(mode_json_path)],
@@ -732,7 +659,6 @@ def modify_partition_mounted(partition_path: Path) -> bool:
             except Exception:
                 pass
 
-            # Read current content (prefer sudo cat so permissions don't bite us)
             try:
                 mode_text = run_command(
                     ["cat", str(mode_json_path)],
@@ -742,23 +668,19 @@ def modify_partition_mounted(partition_path: Path) -> bool:
                 ).stdout
                 content = json.loads(mode_text)
             except Exception:
-                # Fallback: direct open (works if script is run with sudo)
                 with open(mode_json_path, "r") as f:
                     content = json.load(f)
             
             print_info(f"Current mode: {content.get('mode', 'unknown')}")
             
-            # Modify
             content["mode"] = "int-developer"
             
-            # Write back (need sudo)
             temp_json = WORK_DIR / "mode_temp.json"
             with open(temp_json, "w") as f:
                 json.dump(content, f)
 
             run_command(["cp", str(temp_json), str(mode_json_path)], sudo=True)
 
-            # Restore permissions/ownership if we captured them
             if perm is not None:
                 run_command(["chmod", perm, str(mode_json_path)], sudo=True, check=False)
             if uid is not None and gid is not None:
@@ -784,7 +706,6 @@ def modify_partition_mounted(partition_path: Path) -> bool:
         return False
         
     finally:
-        # Always unmount
         try:
             run_command(["umount", str(mount_point)], sudo=True, check=False)
         except:
@@ -811,14 +732,12 @@ def modify_partition_debugfs(partition_path: Path) -> bool:
 
     print_info("Attempting mode.json edit via debugfs (no mount)...")
 
-    # Potential locations inside /var
     candidate_paths = [
         "/jibo/mode.json",
         "/mode.json",
         "/etc/jibo/mode.json",
     ]
 
-    # Find which path exists by trying to cat it
     existing_path: Optional[str] = None
     original_text: Optional[str] = None
     for p in candidate_paths:
@@ -828,7 +747,6 @@ def modify_partition_debugfs(partition_path: Path) -> bool:
                 capture_output=True,
                 check=True,
             )
-            # debugfs prints to stdout for cat
             if res.stdout and "File not found" not in res.stdout:
                 existing_path = p
                 original_text = res.stdout
@@ -840,7 +758,6 @@ def modify_partition_debugfs(partition_path: Path) -> bool:
         print_warning("debugfs could not locate mode.json inside the image")
         return False
 
-    # Save backup
     try:
         (WORK_DIR / "mode.json.original").write_text(original_text)
     except Exception:
@@ -858,9 +775,6 @@ def modify_partition_debugfs(partition_path: Path) -> bool:
     temp_json = WORK_DIR / "mode_temp.json"
     temp_json.write_text(new_text)
 
-    # Overwrite: remove then write to ensure replacement works even if size differs.
-    # This may change filesystem allocation, which is fine for full /var write, and
-    # our patch-write logic can still handle it.
     try:
         run_command([debugfs, "-w", "-R", f"rm {existing_path}", str(partition_path)], check=False, capture_output=True)
         run_command([debugfs, "-w", "-R", f"write {str(temp_json)} {existing_path}", str(partition_path)], capture_output=True)
@@ -881,17 +795,14 @@ def modify_var_partition(partition_path: Path) -> bool:
     """Modify the var partition to enable developer mode"""
     print_step(4, 6, "Modifying var partition")
 
-    # On Linux, prefer mounting: it's the only truly safe way to update a file in an ext filesystem.
     if platform.system() == "Linux":
         if modify_partition_mounted(partition_path):
             return True
         print_warning("Mount-based edit failed; falling back to raw in-place patch")
 
-    # If mounting is unavailable (Windows/macOS) or failed, try debugfs (ext filesystem edit without mount)
     if modify_partition_debugfs(partition_path):
         return True
 
-    # Raw patch is a best-effort last resort
     if modify_mode_json_direct(partition_path):
         return True
     
@@ -969,7 +880,6 @@ def compute_changed_sector_ranges(original_path: Path, modified_path: Path, sect
                 base_sector += len(b1) // sector_size
                 continue
 
-            # Chunk differs; identify sector-level diffs within this chunk
             sectors_in_chunk = min(len(b1), len(b2)) // sector_size
             for i in range(sectors_in_chunk):
                 s1 = b1[i * sector_size:(i + 1) * sector_size]
@@ -1025,9 +935,6 @@ def write_partition_patch_to_emmc(original_path: Path, modified_path: Path, base
     return True
 
 
-# ============================================================================
-# eMMC Operations
-# ============================================================================
 
 def get_shofel_path() -> Path:
     """Get the path to shofel2_t124 executable"""
@@ -1058,7 +965,6 @@ def dump_emmc(output_path: Path, start_sector: int = 0, num_sectors: int = EMMC_
             str(output_path)
         ]
         
-        # Run with sudo on Linux
         if platform.system() == "Linux":
             cmd = ["sudo"] + cmd
         
@@ -1136,7 +1042,6 @@ def verify_write(partition_path: Path, start_sector: int, num_sectors: int) -> b
         
         subprocess.run(cmd, cwd=SHOFEL_DIR, check=True)
         
-        # Compare hashes
         with open(partition_path, "rb") as f:
             original_hash = hashlib.md5(f.read()).hexdigest()
         
@@ -1157,22 +1062,17 @@ def verify_write(partition_path: Path, start_sector: int, num_sectors: int) -> b
         return False
 
 
-# ============================================================================
-# Main Workflow
-# ============================================================================
 
 def run_full_mod(args) -> bool:
     """Run the complete modding workflow"""
     print_banner()
     
-    # Check system
     sys_info = get_system_info()
     print_info(f"System: {sys_info['os']} ({sys_info['arch']})")
     
     if sys_info['is_wsl']:
         print_info("Running in WSL - USB passthrough may require additional setup")
     
-    # Check dependencies
     print_step(0, 6, "Checking dependencies")
     
     if sys_info['os'] == "Linux":
@@ -1190,25 +1090,20 @@ def run_full_mod(args) -> bool:
     
     print_success("All required dependencies found!")
     
-    # Create work directory
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     
-    # Build Shofel
     if not build_shofel(force_rebuild=args.rebuild_shofel):
         return False
     
-    # Detect or wait for Jibo
     if not args.skip_detection:
         if not detect_jibo_rcm():
             if not wait_for_jibo_rcm(timeout=120):
                 return False
     
-    # Paths
     dump_path = WORK_DIR / "jibo_full_dump.bin"
     var_partition_path = WORK_DIR / "var_partition.bin"
     backup_var_path = WORK_DIR / "var_partition_backup.bin"
     
-    # Dump eMMC (or use existing dump)
     if args.dump_path:
         dump_path = Path(args.dump_path)
         if not dump_path.exists():
@@ -1222,7 +1117,6 @@ def run_full_mod(args) -> bool:
         if not dump_emmc(dump_path):
             return False
     
-    # Parse partitions
     print_step(3, 6, "Analyzing partition table")
     
     partitions = parse_gpt_partitions(dump_path)
@@ -1235,7 +1129,6 @@ def run_full_mod(args) -> bool:
         size_mb = (part.size_sectors * EMMC_SECTOR_SIZE) / (1024 * 1024)
         print(f"  {part.number}: sectors {part.start_sector}-{part.end_sector} ({size_mb:.1f} MB) - {part.name}")
     
-    # Find var partition
     var_partition = find_var_partition(partitions)
     if not var_partition:
         print_error("Could not identify /var partition")
@@ -1243,35 +1136,28 @@ def run_full_mod(args) -> bool:
     
     print_success(f"Identified /var partition: partition {var_partition.number}")
     
-    # Extract var partition
     if not extract_partition(dump_path, var_partition, var_partition_path):
         return False
     
-    # Create backup
     shutil.copy(var_partition_path, backup_var_path)
     print_info(f"Backup created: {backup_var_path}")
     
-    # Modify partition
     if not modify_var_partition(var_partition_path):
         return False
     
-    # Check if Jibo still connected (may need to re-enter RCM)
     if not args.skip_detection:
         print_info("Please ensure Jibo is still in RCM mode")
         print_info("If Jibo rebooted, re-enter RCM mode now")
         if not wait_for_jibo_rcm(timeout=60):
             print_warning("Continuing anyway...")
     
-    # Write modified partition
     if not write_partition_to_emmc(var_partition_path, var_partition.start_sector):
         return False
     
-    # Verify
     if args.verify:
         if not verify_write(var_partition_path, var_partition.start_sector, var_partition.size_sectors):
             print_warning("Verification failed, but write may still be successful")
     
-    # Done!
     print(f"""
 {Colors.GREEN}╔═══════════════════════════════════════════════════════════════════╗
 ║                     {Colors.BOLD}MODDING COMPLETE!{Colors.RESET}{Colors.GREEN}                             ║
@@ -1302,11 +1188,9 @@ def run_dump_only(args) -> bool:
     
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     
-    # Build Shofel
     if not build_shofel(force_rebuild=args.rebuild_shofel):
         return False
     
-    # Wait for Jibo
     if not args.skip_detection:
         if not wait_for_jibo_rcm(timeout=120):
             return False
@@ -1325,11 +1209,9 @@ def run_write_only(args) -> bool:
         print_error(f"Partition file not found: {partition_path}")
         return False
     
-    # Build Shofel if needed
     if not build_shofel():
         return False
     
-    # Wait for Jibo
     if not args.skip_detection:
         if not wait_for_jibo_rcm(timeout=120):
             return False
@@ -1344,16 +1226,13 @@ def run_mode_json_only(args) -> bool:
 
     WORK_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Build Shofel
     if not build_shofel(force_rebuild=args.rebuild_shofel):
         return False
 
-    # Wait for Jibo
     if not args.skip_detection:
         if not wait_for_jibo_rcm(timeout=120):
             return False
 
-    # Dump GPT / partition table (small read)
     gpt_path = WORK_DIR / "gpt_dump.bin"
     gpt_sectors = 4096  # 2MB; safely covers typical GPT entry area
     print_info(f"Dumping GPT header/table ({gpt_sectors} sectors)...")
@@ -1375,7 +1254,6 @@ def run_mode_json_only(args) -> bool:
         f"(start=0x{var_partition.start_sector:x}, sectors={var_partition.size_sectors})"
     )
 
-    # Dump /var partition only
     original_var_path = WORK_DIR / "var_partition_original.bin"
     var_partition_path = WORK_DIR / "var_partition.bin"
     backup_var_path = WORK_DIR / "var_partition_backup.bin"
@@ -1388,17 +1266,14 @@ def run_mode_json_only(args) -> bool:
     shutil.copy(original_var_path, backup_var_path)
     print_info(f"Backup created: {backup_var_path}")
 
-    # Modify mode.json inside /var
     if not modify_var_partition(var_partition_path):
         return False
 
-    # Re-check connectivity (optional)
     if not args.skip_detection:
         print_info("Please ensure Jibo is still in RCM mode")
         if not wait_for_jibo_rcm(timeout=60):
             print_warning("Continuing anyway...")
 
-    # Write back: patch by default, full write if requested
     if args.full_var_write:
         print_info("Writing full /var partition back to device...")
         if not write_partition_to_emmc(var_partition_path, var_partition.start_sector):
@@ -1408,7 +1283,6 @@ def run_mode_json_only(args) -> bool:
         if not write_partition_patch_to_emmc(original_var_path, var_partition_path, var_partition.start_sector):
             return False
 
-    # Verify (reads back full /var; optional)
     if args.verify:
         if not verify_write(var_partition_path, var_partition.start_sector, var_partition.size_sectors):
             print_warning("Verification failed, but write may still be successful")
@@ -1419,9 +1293,6 @@ def run_mode_json_only(args) -> bool:
     return True
 
 
-# ============================================================================
-# CLI
-# ============================================================================
 
 def main():
     parser = argparse.ArgumentParser(
@@ -1436,7 +1307,6 @@ Examples:
         """
     )
     
-    # Operation modes
     mode_group = parser.add_mutually_exclusive_group()
     mode_group.add_argument("--dump-only", action="store_true",
                            help="Only dump the eMMC without modifying")
@@ -1445,7 +1315,6 @@ Examples:
     mode_group.add_argument("--mode-json-only", action="store_true",
                            help="Fast mode: dump GPT + /var only, patch /var/jibo/mode.json, write back minimal changes")
     
-    # Options
     parser.add_argument("--dump-path", metavar="FILE",
                        help="Use existing dump file instead of dumping")
     parser.add_argument("--output", "-o", metavar="FILE",
@@ -1467,11 +1336,9 @@ Examples:
     
     args = parser.parse_args()
     
-    # Validate arguments
     if args.write_partition and not args.start_sector:
         parser.error("--write-partition requires --start-sector")
     
-    # Run appropriate mode
     try:
         if args.dump_only:
             success = run_dump_only(args)

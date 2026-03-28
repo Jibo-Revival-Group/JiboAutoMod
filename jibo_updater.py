@@ -31,9 +31,14 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional
+import socket
+import threading
+import http.server
+import socketserver
 
 import paramiko
 
@@ -42,6 +47,10 @@ SCRIPT_DIR = Path(__file__).parent.resolve()
 WORK_DIR = SCRIPT_DIR / "jibo_work"
 UPDATES_DIR = WORK_DIR / "updates"
 STATE_FILE_DEFAULT = WORK_DIR / "update_state.json"
+
+__version__ = "0.2.0"
+
+DEFAULT_UPDATER_RELEASES_API = "https://kevinblog.sytes.net/Code/api/v1/repos/Kevin/JiboUpdater/releases"
 
 DEFAULT_RELEASES_API = "https://kevinblog.sytes.net/Code/api/v1/repos/Kevin/JiboOs/releases"
 
@@ -115,6 +124,65 @@ def http_get_json(url: str, timeout: int = 20) -> object:
     return json.loads(data.decode("utf-8", errors="replace"))
 
 
+def check_updater_version(releases_api: str, current_version: str) -> tuple[Optional[str], bool]:
+    """Return (latest_tag, is_newer) comparing semantic-ish tags.
+
+    If the check fails, returns (None, False).
+    """
+    try:
+        raw = http_get_json(releases_api)
+    except Exception:
+        return None, False
+
+    if not isinstance(raw, list) or not raw:
+        return None, False
+
+    tags: list[str] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        tags.append(str(item.get("tag_name", "")))
+
+    tags = [t for t in tags if t]
+    if not tags:
+        return None, False
+
+    tags.sort(key=_version_tuple, reverse=True)
+    latest = tags[0]
+    try:
+        is_newer = _version_tuple(latest) > _version_tuple(current_version)
+    except Exception:
+        is_newer = False
+    return latest, is_newer
+
+
+class _Spinner:
+    def __init__(self, message: str = ""):
+        self._stop = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+        self.message = message
+
+    def start(self):
+        def _spin():
+            chars = "|/-\\"
+            i = 0
+            while not self._stop.is_set():
+                sys.stdout.write(f"\r{self.message} {chars[i % len(chars)]}")
+                sys.stdout.flush()
+                i += 1
+                time.sleep(0.12)
+            sys.stdout.write("\r" + " " * (len(self.message) + 4) + "\r")
+            sys.stdout.flush()
+
+        self._thread = threading.Thread(target=_spin, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=1)
+
+
 _VERSION_RE = re.compile(r"^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?")
 
 
@@ -153,7 +221,6 @@ def get_latest_release(releases_api: str, allow_prerelease: bool) -> Release:
     if not releases:
         raise RuntimeError("No releases found (after prerelease filtering)")
 
-    # Gitea usually returns newest first, but sort by semver-ish tag to be safe.
     releases.sort(key=lambda r: _version_tuple(r.tag_name), reverse=True)
     return releases[0]
 
@@ -171,11 +238,9 @@ def normalize_download_url(download_url: str, base_url: str) -> str:
     base = urllib.parse.urlparse(base_url)
     dl = urllib.parse.urlparse(download_url)
 
-    # If already matches, keep as-is.
     if dl.scheme == base.scheme and dl.netloc == base.netloc:
         return download_url
 
-    # If download URL is missing components or has a different host, rewrite it.
     return urllib.parse.urlunparse(
         (base.scheme, base.netloc, dl.path, dl.params, dl.query, dl.fragment)
     )
@@ -261,7 +326,6 @@ def _extract(archive: Path, extract_dir: Path, *, force: bool = False) -> Path:
                 member_path = extract_dir / member.name
                 if not _is_within(extract_dir, member_path):
                     raise RuntimeError(f"Unsafe path in tar archive: {member.name}")
-            # Python 3.14 changes tar default filtering behavior; be explicit.
             try:
                 tf.extractall(extract_dir, filter="data")
             except TypeError:
@@ -291,7 +355,6 @@ def _score_build_dir(path: Path) -> int:
     for name, weight in (("etc", 5), ("opt", 5), ("var", 2), ("usr", 2), ("lib", 1), ("bin", 1)):
         if (path / name).exists():
             score += weight
-    # Prefer build dirs that are under a version folder like V3.1/build
     parts = {p.lower() for p in path.parts}
     if any(re.fullmatch(r"v\d+(?:\.\d+)*", p, flags=re.IGNORECASE) for p in parts):
         score += 2
@@ -362,7 +425,6 @@ def ssh_exec(client: paramiko.SSHClient, command: str, timeout: int = 60) -> tup
 
 
 def ensure_remote_dir(sftp: paramiko.SFTPClient, remote_dir: str) -> None:
-    # Create each path component if missing.
     parts = [p for p in remote_dir.split("/") if p]
     cur = "/"
     for part in parts:
@@ -394,6 +456,10 @@ def upload_tree(
             if dry_run:
                 continue
             ensure_remote_dir(sftp, remote_path)
+            try:
+                sftp.chmod(remote_path, 0o777)
+            except Exception:
+                pass
             continue
 
         if p.is_symlink():
@@ -401,19 +467,20 @@ def upload_tree(
             if dry_run:
                 sent += 1
                 continue
-            # Ensure parent exists
             ensure_remote_dir(sftp, posixpath.dirname(remote_path))
             try:
-                # Remove if exists
                 try:
                     sftp.remove(remote_path)
                 except IOError:
                     pass
                 sftp.symlink(target, remote_path)
             except Exception:
-                # Fallback: dereference and upload file content
                 real_path = p.resolve()
                 sftp.put(str(real_path), remote_path)
+            try:
+                sftp.chmod(remote_path, 0o777)
+            except Exception:
+                pass
             sent += 1
             if sent % 200 == 0:
                 print_info(f"Uploaded {sent}/{total} entries...")
@@ -427,8 +494,7 @@ def upload_tree(
             ensure_remote_dir(sftp, posixpath.dirname(remote_path))
             sftp.put(str(p), remote_path)
             try:
-                mode = p.stat().st_mode & 0o777
-                sftp.chmod(remote_path, mode)
+                sftp.chmod(remote_path, 0o777)
             except Exception:
                 pass
 
@@ -455,14 +521,177 @@ def set_mode_json_to_normal(sftp: paramiko.SFTPClient) -> None:
         data["mode"] = "normal"
         new_content = json.dumps(data, separators=(",", ": ")) + "\n"
     except Exception:
-        # Fallback for non-standard formatting
         new_content = re.sub(r'("mode"\s*:\s*")([^"]+)(")', r'\1normal\3', content)
         if new_content == content:
-            # As a last resort, overwrite with a minimal JSON.
             new_content = '{"mode": "normal"}\n'
 
     with sftp.open(remote, "w") as f:
         f.write(new_content.encode("utf-8"))
+
+
+def load_distributors_file(path: Path) -> dict:
+    try:
+        raw = json.loads(path.read_text("utf-8"))
+        return raw if isinstance(raw, dict) else {}
+    except Exception:
+        return {}
+
+
+def measure_host_latency(url: str, timeout: int = 5) -> float:
+    start = time.time()
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "JiboUpdater/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            resp.read(512)
+        return time.time() - start
+    except Exception:
+        return float("inf")
+
+
+def get_releases_from_host(api_url: str) -> list[Release]:
+    try:
+        raw = http_get_json(api_url)
+    except Exception:
+        return []
+    releases: list[Release] = []
+    if isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            releases.append(
+                Release(
+                    tag_name=str(item.get("tag_name", "")),
+                    name=str(item.get("name", "")),
+                    prerelease=bool(item.get("prerelease", False)),
+                    tarball_url=str(item.get("tarball_url", "")),
+                    zipball_url=str(item.get("zipball_url", "")),
+                )
+            )
+    return releases
+
+
+def list_local_archives() -> list[Release]:
+    dl = UPDATES_DIR / "downloads"
+    found: list[Release] = []
+    if not dl.exists():
+        return found
+    for p in dl.iterdir():
+        if not p.is_file():
+            continue
+        name = p.name
+        if name.endswith((".tar.gz", ".tgz", ".zip")):
+            tag = name.rsplit(".", 2)[0]
+            found.append(Release(tag_name=tag, name=tag, prerelease=False, tarball_url=str(p), zipball_url=""))
+    return found
+
+
+def robots_config_path() -> Path:
+    return WORK_DIR / "robots.json"
+
+
+def load_robots() -> dict:
+    p = robots_config_path()
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text("utf-8"))
+    except Exception:
+        return {}
+
+
+def save_robots(data: dict) -> None:
+    p = robots_config_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def fetch_robot_identity(host: str, user: str, password: str, timeout: int = 10) -> Optional[str]:
+    try:
+        client = ssh_connect(host, user, password, timeout=timeout)
+        try:
+            sftp = client.open_sftp()
+            try:
+                with sftp.open("/var/jibo/identity.json", "r") as f:
+                    content = f.read().decode("utf-8", errors="replace")
+                    data = json.loads(content)
+                    name = None
+                    if isinstance(data, dict):
+                        name = data.get("name") or data.get("robot_name")
+                        if isinstance(name, str):
+                            return name
+            finally:
+                sftp.close()
+        finally:
+            client.close()
+    except Exception:
+        return None
+    return None
+
+
+def prompt_select_release_and_host(distributors_file: Path) -> tuple[Optional[Release], Optional[str], str]:
+    d = load_distributors_file(distributors_file)
+    hosts = d.get("UpdateHosts") or d.get("OfficialHosts") or []
+    hosts = [h for h in hosts if isinstance(h, str)]
+
+    print_info("Checking hosts for latency and available releases...")
+    host_infos = []
+    for h in hosts:
+        lat = measure_host_latency(h)
+        releases = get_releases_from_host(h)
+        host_infos.append((h, lat, releases))
+
+    local_releases = list_local_archives()
+    if local_releases:
+        host_infos.append(("local", 0.0, local_releases))
+
+    print("Hosts (lower latency preferred):")
+    host_infos.sort(key=lambda t: (t[1] if isinstance(t[1], float) else float("inf")))
+    for idx, (h, lat, rels) in enumerate(host_infos, start=1):
+        label = f"{h} ({'local' if h=='local' else f'{lat:.2f}s'}) - {len(rels)} releases"
+        print(f"{idx}) {label}")
+
+    chosen_host_idx = None
+    while chosen_host_idx is None:
+        ans = input("Choose host number to browse releases (or q to cancel): ").strip()
+        if ans.lower() in {"q", "quit", "exit"}:
+            return None, None, ""
+        if not ans.isdigit():
+            print("Enter a number.")
+            continue
+        i = int(ans)
+        if i < 1 or i > len(host_infos):
+            print("Out of range")
+            continue
+        chosen_host_idx = i - 1
+
+    host, lat, releases = host_infos[chosen_host_idx]
+    if not releases:
+        print_warning("No releases found for that host.")
+        return None, host, "remote"
+
+    releases.sort(key=lambda r: _version_tuple(r.tag_name), reverse=True)
+    for idx, r in enumerate(releases, start=1):
+        pre = " [prerelease]" if r.prerelease else ""
+        print(f"{idx}) {r.tag_name}{pre} - {r.name}")
+    ans = input("Choose release number (or 'l' to list release notes, number to pick, q to cancel): ").strip()
+    if ans.lower() == "q":
+        return None, host, ""
+    if ans.lower() == "l":
+        sub = input("Release number to show notes: ").strip()
+        if sub.isdigit():
+            si = int(sub) - 1
+            if 0 <= si < len(releases):
+                print(releases[si].name)
+                print(releases[si].tag_name)
+        return None, host, ""
+    if not ans.isdigit():
+        return None, host, ""
+    ri = int(ans) - 1
+    if ri < 0 or ri >= len(releases):
+        return None, host, ""
+    chosen = releases[ri]
+    source = "local" if host == "local" else "remote"
+    return chosen, host, source
 
 
 def main() -> int:
@@ -473,6 +702,9 @@ def main() -> int:
     parser.add_argument("--user", default="root", help="SSH username (default: root)")
     parser.add_argument("--password", default="jibo", help="SSH password (default: jibo)")
     parser.add_argument("--releases-api", default=DEFAULT_RELEASES_API, help="Gitea releases API URL")
+    parser.add_argument("--distributors", type=Path, default=Path("Distributors.json"), help="Path to Distributors.json to check multiple hosts")
+    parser.add_argument("--tui", action="store_true", help="Run an interactive text UI to pick host/release")
+    parser.add_argument("--updater-releases-api", default=DEFAULT_UPDATER_RELEASES_API, help="Releases API to check for updater updates")
 
     parser.add_argument("--stable", action="store_true", help="Ignore prereleases")
     parser.add_argument("--tag", help="Install a specific tag (e.g. v3.3.0) instead of latest")
@@ -501,11 +733,48 @@ def main() -> int:
 
     _ensure_dirs()
 
+    logp = WORK_DIR / "updater.log"
+    logp.parent.mkdir(parents=True, exist_ok=True)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s: %(message)s",
+        handlers=[logging.FileHandler(logp, encoding="utf-8"), logging.StreamHandler(sys.stdout)],
+    )
+    logging.info("jibo_updater starting, version %s", __version__)
+
+    spinner = _Spinner("Checking updater version...")
+    spinner.start()
+    try:
+        latest_tag, is_newer = check_updater_version(args.updater_releases_api, __version__)
+    finally:
+        spinner.stop()
+
+    if latest_tag:
+        if is_newer:
+            msg = f"Updater update available: {latest_tag} (current {__version__})"
+            print_warning(msg)
+            logging.info(msg)
+        else:
+            msg = f"Updater is up-to-date ({__version__})"
+            print_info(msg)
+            logging.info(msg)
+    else:
+        logging.info("Updater version check failed or no releases found")
+
     allow_prerelease = not args.stable
 
     print_info("Checking latest release...")
-    if args.tag:
-        # Fetch all releases and pick the one matching tag
+    chosen_remote_source: Optional[str] = None
+    chosen_source_type = "remote"
+    if args.tui:
+        rel_choice, host_choice, source = prompt_select_release_and_host(args.distributors)
+        if rel_choice is None:
+            print_info("No release selected; aborting.")
+            return 2
+        release = rel_choice
+        chosen_remote_source = host_choice
+        chosen_source_type = source
+    elif args.tag:
         raw = http_get_json(args.releases_api)
         if not isinstance(raw, list):
             raise RuntimeError("Unexpected releases API response")
@@ -550,27 +819,33 @@ def main() -> int:
             print_info("Aborted.")
             return 2
 
-    # Download + extract
     archive_name = f"{release.tag_name}.tar.gz"
     archive_path = UPDATES_DIR / "downloads" / archive_name
     extract_dir = UPDATES_DIR / "extracted" / release.tag_name
 
-    tarball_url = normalize_download_url(release.tarball_url, args.releases_api)
+    if chosen_remote_source and chosen_source_type == "remote":
+        tarball_url = normalize_download_url(release.tarball_url, chosen_remote_source)
+    elif chosen_source_type == "local":
+        tarball_url = release.tarball_url
+    else:
+        tarball_url = normalize_download_url(release.tarball_url, args.releases_api)
 
     try:
-        _download(tarball_url, archive_path, force=args.force)
+        if isinstance(tarball_url, str) and Path(tarball_url).exists():
+            archive_path = Path(tarball_url)
+            print_info(f"Using local archive: {archive_path}")
+        else:
+            _download(tarball_url, archive_path, force=args.force)
     except urllib.error.URLError as e:
         raise RuntimeError(f"Download failed: {e}")
 
     _extract(archive_path, extract_dir, force=args.force)
 
-    # Gitea archives usually create a single top-level folder. Prefer that as the search root.
     children = [p for p in extract_dir.iterdir() if p.is_dir()]
     search_root = children[0] if len(children) == 1 else extract_dir
 
     build_dir = find_build_dir(search_root, args.build_path)
 
-    # Connect and update
     print_info(f"Connecting to {args.user}@{args.host} ...")
     client = ssh_connect(args.host, args.user, args.password, timeout=args.ssh_timeout)
     try:
@@ -619,7 +894,6 @@ def main() -> int:
                     sftp.close()
 
         if not args.dry_run:
-            # Update local state
             if isinstance(state, dict):
                 state[args.host] = release.tag_name
                 save_state(args.state_file, state)

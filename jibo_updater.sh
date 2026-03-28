@@ -16,3 +16,7 @@ if command -v python3 >/dev/null 2>&1; then
 fi
 
 exec python "$SCRIPT_DIR/jibo_updater.py" "$@"
+
+# NOTE: The updater uses only the standard library and `paramiko`.
+# If you don't have `paramiko` installed in your environment, install it:
+# python3 -m pip install paramiko
