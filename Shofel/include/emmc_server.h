@@ -15,14 +15,22 @@
 #define EMMC_CMD_ERASE          0x05  /* Erase a range of sectors (forces reallocation) */
 #define EMMC_CMD_EXIT           0xFF
 
-/* Transfer chunk sizes basically the amount much data is sent/received per USB transfer was not multiple of 0x1000
- *
- * Reads: 8 sectors (4KB) = 1.1 MB/s - OPTIMIZED
- * Writes: 1 sector (512B) - ORIGINAL (safe)
+/* Boot partition encoding for EMMC_CMD_READ / EMMC_CMD_WRITE start_sector:
+ *   0x00000000 | sector  -> User Data Area  (normal)
+ *   0x80000000 | sector  -> Boot Partition 1 (boot0)
+ *   0xC0000000 | sector  -> Boot Partition 2 (boot1)
+ * The payload switches the eMMC partition, performs the I/O, then restores UDA.
+ * Use sector=0 and num_sectors=boot_size_sectors to dump an entire boot partition.
+ */
+#define EMMC_BOOT0_BASE  0x80000000U
+#define EMMC_BOOT1_BASE  0xC0000000U
+
+/* Transfer chunk sizes: sectors per USB transfer.
+ * Both read and write now use 8-sector (4 KB) chunks via CMD18/CMD25.
  */
 #define EMMC_CHUNK_SECTORS_READ    8
-#define EMMC_CHUNK_SECTORS_WRITE   1
-#define EMMC_CHUNK_SECTORS         1   /* Default - single sector for compatibility */
+#define EMMC_CHUNK_SECTORS_WRITE   8
+#define EMMC_CHUNK_SECTORS         8
 #define EMMC_SECTOR_SIZE           512
 #define EMMC_CHUNK_BYTES           (EMMC_CHUNK_SECTORS * EMMC_SECTOR_SIZE)
 

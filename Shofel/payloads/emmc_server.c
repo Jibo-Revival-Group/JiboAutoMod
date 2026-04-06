@@ -170,9 +170,27 @@ static int send_cmd(u32 cmd_val, u32 argument) {
 #define MMC_CMD18   0x123A  /* READ_MULTIPLE_BLOCK: R1, data, CRC+index check */
 #define MMC_CMD24   0x183A  /* WRITE_BLOCK: R1, data, CRC+index check */
 #define MMC_CMD25   0x193A  /* WRITE_MULTIPLE_BLOCK: R1, data, CRC+index check */
+#define MMC_CMD6    0x061B  /* SWITCH: R1b, no data, CRC+index check */
 #define MMC_CMD35   0x233A  /* ERASE_GROUP_START: R1, CRC+index check */
 #define MMC_CMD36   0x243A  /* ERASE_GROUP_END: R1, CRC+index check */
 #define MMC_CMD38   0x263B  /* ERASE: R1b, CRC+index check */
+
+/*
+ * Boot partition encoding in start_sector for EMMC_CMD_READ / EMMC_CMD_WRITE:
+ *   bits [31:30] == 00  → User Data Area (normal sectors)
+ *   bits [31:30] == 10  → Boot Partition 1 (boot0), real sector in bits [29:0]
+ *   bits [31:30] == 11  → Boot Partition 2 (boot1), real sector in bits [29:0]
+ *
+ * Example: sector 0x80000000 means "boot0, sector 0".
+ *          sector 0xC0000005 means "boot1, sector 5".
+ *
+ * After the operation the partition is switched back to UDA (0).
+ */
+#define BOOT_PART_MASK   0xC0000000U
+#define BOOT_PART_UDA    0x00000000U
+#define BOOT_PART_BOOT0  0x80000000U
+#define BOOT_PART_BOOT1  0xC0000000U
+#define BOOT_PART_SECTOR(s) ((s) & 0x3FFFFFFFU)
 
 static u32 sdmmc4_initialized = 0;
 static u32 init_error = 0;
@@ -575,6 +593,54 @@ static int read_emmc_sector(u32 sector, u32 *buffer) {
 }
 
 /* Write N sectors to eMMC using multi-block CMD25 */
+static int write_emmc_sectors(u32 sector, u32 count, u32 *buffer) {
+    u32 status;
+    u32 timeout;
+
+    if (count == 0) return 0;
+    if (wait_ready() < 0) return -1;
+
+    write32(SDMMC4_BASE + SDHCI_INT_STATUS, 0xFFFFFFFF);
+    write32(SDMMC4_BASE + SDHCI_BLOCK_SIZE, (count << 16) | 0x200);
+    write32(SDMMC4_BASE + SDHCI_ARGUMENT, sector);
+    write32(SDMMC4_BASE + SDHCI_TRANSFER_MODE,
+                    ((u32)MMC_CMD25 << 16) | XFER_MODE_WRITE_MULTI);
+
+    timeout = 1000000;
+    do {
+        status = read32(SDMMC4_BASE + SDHCI_INT_STATUS);
+        if (status & SDHCI_INT_ERROR) { reset_cmd_dat(); return -2; }
+        if (--timeout == 0) return -3;
+    } while (!(status & SDHCI_INT_CMD_COMPLETE));
+
+    write32(SDMMC4_BASE + SDHCI_INT_STATUS, SDHCI_INT_CMD_COMPLETE);
+
+    for (u32 blk = 0; blk < count; blk++) {
+        timeout = 2000000;
+        do {
+            status = read32(SDMMC4_BASE + SDHCI_INT_STATUS);
+            if (status & SDHCI_INT_ERROR) { reset_cmd_dat(); return -4; }
+            if (--timeout == 0) return -5;
+        } while (!(status & SDHCI_INT_BUF_WR_READY));
+
+        for (u32 i = 0; i < 128; i++) {
+            write32(SDMMC4_BASE + SDHCI_BUFFER, buffer[blk * 128 + i]);
+        }
+
+        write32(SDMMC4_BASE + SDHCI_INT_STATUS, SDHCI_INT_BUF_WR_READY);
+    }
+
+    timeout = 2000000;
+    do {
+        status = read32(SDMMC4_BASE + SDHCI_INT_STATUS);
+        if (status & SDHCI_INT_ERROR) { reset_cmd_dat(); return -6; }
+        if (--timeout == 0) return -7;
+    } while (!(status & SDHCI_INT_XFER_COMPLETE));
+
+    write32(SDMMC4_BASE + SDHCI_INT_STATUS, 0xFFFFFFFF);
+    return 0;
+}
+
 /* Write a single 512-byte sector to eMMC */
 static int write_emmc_sector(u32 sector, u32 *buffer) {
     u32 status;
@@ -715,6 +781,19 @@ static int erase_emmc_sectors(u32 start_sector, u32 end_sector) {
     return 0;
 }
 
+/*
+ * Switch eMMC partition access via CMD6 SWITCH (EXT_CSD[179] PARTITION_CONFIG).
+ *   part 0 = User Data Area
+ *   part 1 = Boot Partition 1 (boot0)
+ *   part 2 = Boot Partition 2 (boot1)
+ * Returns 0 on success, negative on send_cmd error.
+ */
+static int switch_partition_access(u32 part) {
+    /* CMD6 argument: [25:24]=3(WriteByte), [23:16]=179(PARTITION_CONFIG), [15:8]=value, [2:0]=0 */
+    u32 arg = (3U << 24) | (179U << 16) | ((part & 0x7U) << 8);
+    return send_cmd(MMC_CMD6, arg);
+}
+
 __attribute__((section(".init")))
 void entry() {
 
@@ -776,8 +855,14 @@ void entry() {
 
         if (cmd.op == EMMC_CMD_READ) {
             init_sdmmc4();
-            u32 sector = cmd.start_sector;
+
+            /* Decode boot partition encoding from high 2 bits of start_sector */
+            u32 part_sel = cmd.start_sector & BOOT_PART_MASK;
+            u32 sector   = BOOT_PART_SECTOR(cmd.start_sector);
             u32 remaining = cmd.num_sectors;
+
+            if (part_sel != BOOT_PART_UDA)
+                switch_partition_access((part_sel == BOOT_PART_BOOT0) ? 1 : 2);
 
             while (remaining > 0) {
                 u32 batch = remaining > EMMC_CHUNK_SECTORS_READ ? EMMC_CHUNK_SECTORS_READ : remaining;
@@ -795,14 +880,24 @@ void entry() {
                 sector += batch;
                 remaining -= batch;
             }
+
+            if (part_sel != BOOT_PART_UDA)
+                switch_partition_access(0);  /* restore UDA access */
+
             continue;
         }
 
         if (cmd.op == EMMC_CMD_WRITE) {
             init_sdmmc4();
-            u32 sector = cmd.start_sector;
+
+            /* Decode boot partition encoding from high 2 bits of start_sector */
+            u32 part_sel = cmd.start_sector & BOOT_PART_MASK;
+            u32 sector   = BOOT_PART_SECTOR(cmd.start_sector);
             u32 remaining = cmd.num_sectors;
             u32 write_result = 0;
+
+            if (part_sel != BOOT_PART_UDA)
+                switch_partition_access((part_sel == BOOT_PART_BOOT0) ? 1 : 2);
 
             while (remaining > 0) {
                 u32 batch = remaining > EMMC_CHUNK_SECTORS_WRITE ? EMMC_CHUNK_SECTORS_WRITE : remaining;
@@ -823,6 +918,9 @@ void entry() {
                 sector += batch;
                 remaining -= batch;
             }
+
+            if (part_sel != BOOT_PART_UDA)
+                switch_partition_access(0);  /* restore UDA access */
 
             ep1_in_write_imm(&write_result, 4, &num_xfer);
             continue;
