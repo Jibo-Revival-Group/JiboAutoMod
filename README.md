@@ -2,7 +2,7 @@
 
 **Automatically enable developer mode on Jibo robots**
 
-This tool automates the process of modding a Jibo robot to enable SSH access and developer mode. It works on both **Linux** and **Windows**.
+This tool automates the process of modding a Jibo robot to enable SSH access and developer mode. It works on **Linux**, **macOS**, and **Windows**.
 
 ## ⚠️ Warning
 
@@ -22,6 +22,31 @@ chmod +x jibo_automod.sh
 
 # Run the tool
 ./jibo_automod.sh
+```
+
+### macOS
+
+```bash
+# Install required build/USB/ext tools
+xcode-select --install
+brew install libusb pkgconf arm-none-eabi-gcc e2fsprogs
+
+# Run the safer mod path: GPT + /var only, patch-write changed sectors, verify read-back
+chmod +x jibo_automod.sh
+./jibo_automod.sh --mode-json-only
+```
+
+`e2fsprogs` is keg-only in Homebrew. The launcher automatically adds its `debugfs` path; if you run Python directly, use:
+
+```bash
+export PATH="$(brew --prefix)/opt/e2fsprogs/sbin:$PATH"
+python3 jibo_automod.py --mode-json-only
+```
+
+Full eMMC dumping is also supported on macOS:
+
+```bash
+./jibo_automod.sh --dump-only -o my_jibo_backup.bin
 ```
 
 ### Windows
@@ -54,6 +79,15 @@ sudo pacman -S --needed base-devel libusb git python \
                         arm-none-eabi-gcc arm-none-eabi-newlib
 ```
 
+### macOS
+- Python 3.8+
+- Xcode Command Line Tools (`cc`, `make`)
+- Homebrew packages: `libusb`, `pkgconf`, `arm-none-eabi-gcc`, `e2fsprogs`
+- `debugfs` from `e2fsprogs` for safe ext image editing
+- ~20GB free disk space for full dumps; ~1GB+ for `--mode-json-only`
+
+macOS support uses the same `jibo_automod.sh` launcher as Linux. The launcher adds Homebrew's `libusb` and keg-only `e2fsprogs` paths automatically before starting Python.
+
 ### Windows
 - Python 3.8+
 - MSYS2 with MinGW-w64 toolchain
@@ -76,6 +110,19 @@ sudo pacman -S --needed base-devel libusb git python \
 ./jibo_automod.sh
 ```
 
+### Recommended macOS Mod
+On macOS, prefer the focused `/var` workflow unless you specifically want a full backup first:
+
+```bash
+./jibo_automod.sh --mode-json-only
+```
+
+For a full backup without modifying Jibo:
+
+```bash
+./jibo_automod.sh --dump-only -o my_jibo_backup.bin
+```
+
 ## Optional GUI
 
 The GUI is separate from the CLI tools. You can still run `jibo_automod.sh` / `jibo_updater.sh` directly.
@@ -87,6 +134,12 @@ python3 -m pip install -r requirements-gui.txt
 ```
 
 Launch main panel (Linux):
+
+```bash
+./jibo_gui.sh
+```
+
+Launch main panel (macOS):
 
 ```bash
 ./jibo_gui.sh
@@ -157,6 +210,7 @@ To mod your Jibo, you need to put it in RCM (Recovery Mode):
 
 3. **Verify:**
    - On Linux: `lsusb` should show `NVIDIA Corp. APX`
+   - On macOS: System Information > USB should show NVIDIA/APX with Vendor ID `0x0955` and Product ID `0x7740`
    - On Windows: Device Manager shows "APX" device
 
 ## After Modding
@@ -214,6 +268,7 @@ python3 jibo_updater.py --ip <jibo-ip-address> --build-path V3.1/build
 ### "Jibo not found in RCM mode"
 - Make sure you're holding RCM button while pressing reset
 - Try a different USB cable (data cables, not charge-only)
+- On macOS, check System Information > USB for Vendor ID `0x0955` and Product ID `0x7740`
 - On Windows, install WinUSB driver using Zadig
 
 ### "Permission denied" on Linux
@@ -229,8 +284,33 @@ If you see messages about raw edits needing padding, install `debugfs` via MSYS2
 
 Then re-run with `--mode-json-only`.
 
+### macOS: missing debugfs
+Install Homebrew `e2fsprogs`:
+
+```bash
+brew install e2fsprogs
+./jibo_automod.sh --mode-json-only
+```
+
+If running Python directly, add `debugfs` to `PATH` first:
+
+```bash
+export PATH="$(brew --prefix)/opt/e2fsprogs/sbin:$PATH"
+python3 jibo_automod.py --mode-json-only
+```
+
+### macOS: Chip ID read retry
+After each eMMC command, Jibo returns to APX/RCM and macOS may take a moment to re-enumerate USB. If you see a warning like `Couldn't read Chip ID (attempt 1/12)`, leave Jibo connected and wait; the tool will retry before failing.
+
+If all retries fail:
+- reset Jibo back into RCM mode,
+- unplug/replug the USB cable if needed,
+- use a known-good data cable,
+- rerun the same command.
+
 ### Build fails
 - Make sure ARM toolchain is installed
+- On macOS: `brew install libusb pkgconf arm-none-eabi-gcc e2fsprogs`
 - On Arch: `pacman -S arm-none-eabi-gcc arm-none-eabi-newlib`
 - On Ubuntu: `apt install gcc-arm-none-eabi libnewlib-arm-none-eabi`
 
@@ -248,7 +328,7 @@ Then re-run with `--mode-json-only`.
 ```
 JiboAutoMod/
 ├── jibo_automod.py      # Main tool (Python)
-├── jibo_automod.sh      # Linux launcher
+├── jibo_automod.sh      # Linux/macOS launcher
 ├── jibo_automod.bat     # Windows launcher
 ├── README.md            # This file
 ├── guide.md             # Original manual guide

@@ -6,17 +6,39 @@ set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
+OS_NAME="$(uname -s)"
 
 echo ""
 echo "============================================================"
-echo "         JIBO AUTO-MOD TOOL - Linux Launcher"
+echo "         JIBO AUTO-MOD TOOL - Linux/macOS Launcher"
 echo "============================================================"
 echo ""
+
+if [[ "$OS_NAME" == "Darwin" ]]; then
+    BREW_BIN=""
+    if command -v brew >/dev/null 2>&1; then
+        BREW_BIN="$(command -v brew)"
+    elif [[ -x /opt/homebrew/bin/brew ]]; then
+        BREW_BIN="/opt/homebrew/bin/brew"
+    elif [[ -x /usr/local/bin/brew ]]; then
+        BREW_BIN="/usr/local/bin/brew"
+    fi
+
+    if [[ -n "$BREW_BIN" ]]; then
+        BREW_PREFIX="$("$BREW_BIN" --prefix)"
+        export PATH="$BREW_PREFIX/bin:$BREW_PREFIX/sbin:$BREW_PREFIX/opt/e2fsprogs/sbin:$BREW_PREFIX/opt/e2fsprogs/bin:$PATH"
+        export PKG_CONFIG_PATH="$BREW_PREFIX/lib/pkgconfig:$BREW_PREFIX/opt/libusb/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+    fi
+fi
 
 # Check for Python 3
 if ! command -v python3 &> /dev/null; then
     echo "[ERROR] Python 3 not found!"
-    echo "        Install with: sudo apt install python3"
+    if [[ "$OS_NAME" == "Darwin" ]]; then
+        echo "        Install Xcode Command Line Tools or Homebrew Python."
+    else
+        echo "        Install with: sudo apt install python3"
+    fi
     exit 1
 fi
 
@@ -24,7 +46,7 @@ PYVER=$(python3 --version)
 echo "[INFO] Found $PYVER"
 
 # Check if running as root
-if [ "$EUID" -ne 0 ]; then
+if [[ "$OS_NAME" == "Linux" && "$EUID" -ne 0 ]]; then
     echo "[INFO] Not running as root. sudo will be used when needed."
     # Check if we can sudo
     if ! sudo -v &> /dev/null; then
@@ -42,15 +64,23 @@ check_tool() {
 }
 
 MISSING=0
-check_tool "lsusb" "sudo apt install usbutils" || MISSING=1
-check_tool "make" "sudo apt install build-essential" || MISSING=1
-check_tool "gcc" "sudo apt install build-essential" || MISSING=1
-check_tool "arm-none-eabi-gcc" "sudo apt install gcc-arm-none-eabi" || MISSING=1
+
+if [[ "$OS_NAME" == "Darwin" ]]; then
+    check_tool "make" "xcode-select --install" || MISSING=1
+    check_tool "cc" "xcode-select --install" || MISSING=1
+    check_tool "arm-none-eabi-gcc" "brew install arm-none-eabi-gcc" || MISSING=1
+    check_tool "debugfs" "brew install e2fsprogs" || MISSING=1
+else
+    check_tool "make" "sudo apt install build-essential" || MISSING=1
+    check_tool "lsusb" "sudo apt install usbutils" || MISSING=1
+    check_tool "gcc" "sudo apt install build-essential" || MISSING=1
+    check_tool "arm-none-eabi-gcc" "sudo apt install gcc-arm-none-eabi" || MISSING=1
+fi
 
 if [ $MISSING -eq 1 ]; then
     echo ""
-    echo "[WARNING] Some dependencies are missing. The tool will try to continue"
-    echo "          but some features may not work."
+    echo "[WARNING] Some dependencies are missing. The Python preflight will"
+    echo "          stop any mode that requires them."
     echo ""
 fi
 

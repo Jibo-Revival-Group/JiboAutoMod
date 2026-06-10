@@ -5,6 +5,10 @@
 
 UNAME_S := $(shell uname -s 2>/dev/null || echo Windows)
 UNAME_M := $(shell uname -m 2>/dev/null || echo x86_64)
+BREW_PREFIX := $(shell brew --prefix 2>/dev/null)
+ifeq ($(BREW_PREFIX),)
+    BREW_PREFIX := /usr/local
+endif
 
 ifeq ($(UNAME_S),Linux)
     PLATFORM := linux
@@ -14,8 +18,8 @@ ifeq ($(UNAME_S),Linux)
 else ifeq ($(UNAME_S),Darwin)
     PLATFORM := macos
     EXE_EXT :=
-    LIBUSB_CFLAGS := $(shell pkg-config --cflags libusb-1.0 2>/dev/null || echo -I/usr/local/include/libusb-1.0)
-    LIBUSB_LIBS := $(shell pkg-config --libs libusb-1.0 2>/dev/null || echo -L/usr/local/lib -lusb-1.0)
+    LIBUSB_CFLAGS := $(shell pkg-config --cflags libusb-1.0 2>/dev/null || echo -I$(BREW_PREFIX)/include/libusb-1.0)
+    LIBUSB_LIBS := $(shell pkg-config --libs libusb-1.0 2>/dev/null || echo -L$(BREW_PREFIX)/lib -lusb-1.0)
 else ifneq (,$(findstring MINGW,$(UNAME_S)))
     PLATFORM := windows
     EXE_EXT := .exe
@@ -58,7 +62,11 @@ endif
 
 # --------- x86/x64 Host Compiler ---------
 
-CC_x86 = gcc
+ifeq ($(PLATFORM),macos)
+    CC_x86 ?= cc
+else
+    CC_x86 ?= gcc
+endif
 CFLAGS_x86 := $(CFLAGS) $(LIBUSB_CFLAGS)
 LDFLAGS_x86 := $(LIBUSB_LIBS)
 
@@ -151,4 +159,3 @@ info:
 	@echo "ARM Toolchain: $(TOOLCHAIN_ARM)"
 
 .PHONY: all clean cleanall host-only payloads-only info
-

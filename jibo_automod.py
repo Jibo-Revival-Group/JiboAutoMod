@@ -31,6 +31,8 @@ WORK_DIR = SCRIPT_DIR / "jibo_work"
 
 EMMC_TOTAL_SECTORS = 0x1D60000  # Total sectors to dump (~15GB)
 EMMC_SECTOR_SIZE = 512
+JIBO_RCM_VENDOR_ID = 0x0955
+JIBO_RCM_PRODUCT_ID = 0x7740
 
 class Colors:
     RED = '\033[91m'
@@ -117,6 +119,106 @@ def run_command(cmd: List[str], cwd: Optional[Path] = None,
         raise
 
 
+def _homebrew_prefix(formula: Optional[str] = None) -> Optional[Path]:
+    """Return an installed Homebrew prefix, including formula opt prefixes."""
+    brew = shutil.which("brew")
+    if not brew:
+        for candidate in ("/opt/homebrew/bin/brew", "/usr/local/bin/brew"):
+            if Path(candidate).exists():
+                brew = candidate
+                break
+    if not brew:
+        return None
+
+    cmd = [brew, "--prefix"]
+    if formula:
+        cmd.append(formula)
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    except Exception:
+        return None
+
+    if result.returncode != 0:
+        return None
+
+    prefix = Path(result.stdout.strip())
+    return prefix if prefix.exists() else None
+
+
+def _homebrew_prefix_candidates() -> List[Path]:
+    """Likely Homebrew prefixes, ordered by the active brew first."""
+    candidates: List[Path] = []
+    active = _homebrew_prefix()
+    if active:
+        candidates.append(active)
+    for prefix in (Path("/opt/homebrew"), Path("/usr/local")):
+        if prefix.exists() and prefix not in candidates:
+            candidates.append(prefix)
+    return candidates
+
+
+def _find_executable(names: Tuple[str, ...], extra_dirs: Tuple[Path, ...] = ()) -> Optional[str]:
+    """Find an executable on PATH or in explicit directories."""
+    for name in names:
+        found = shutil.which(name)
+        if found:
+            return found
+
+    for directory in extra_dirs:
+        for name in names:
+            candidate = directory / name
+            if candidate.exists() and os.access(candidate, os.X_OK):
+                return str(candidate)
+    return None
+
+
+def _pkg_config_exists(package: str) -> bool:
+    pkg_config_dirs: List[Path] = []
+    for prefix in _homebrew_prefix_candidates():
+        pkg_config_dirs.extend([prefix / "bin", prefix / "opt" / "pkgconf" / "bin"])
+
+    pkg_config = _find_executable(("pkg-config", "pkgconf"), tuple(pkg_config_dirs))
+    if not pkg_config:
+        return False
+
+    result = subprocess.run([pkg_config, "--exists", package], capture_output=True)
+    return result.returncode == 0
+
+
+def _libusb_available() -> bool:
+    if _pkg_config_exists("libusb-1.0"):
+        return True
+
+    prefixes = _homebrew_prefix_candidates() + [Path("/usr")]
+    for prefix in prefixes:
+        header = prefix / "include" / "libusb-1.0" / "libusb.h"
+        has_library = any(
+            any(prefix.glob(pattern))
+            for pattern in (
+                "lib/libusb-1.0.*",
+                "lib/*/libusb-1.0.*",
+                "lib64/libusb-1.0.*",
+            )
+        )
+        if header.exists() and has_library:
+            return True
+
+    return False
+
+
+def _debugfs_search_dirs() -> Tuple[Path, ...]:
+    dirs: List[Path] = []
+    for prefix in _homebrew_prefix_candidates():
+        dirs.extend([
+            prefix / "opt" / "e2fsprogs" / "sbin",
+            prefix / "opt" / "e2fsprogs" / "bin",
+            prefix / "sbin",
+            prefix / "bin",
+        ])
+    return tuple(dirs)
+
+
 def get_system_info() -> dict:
     """Get system information"""
     return {
@@ -170,18 +272,45 @@ def check_linux_dependencies() -> Tuple[bool, List[str], List[str]]:
         if not shutil.which("arm-none-eabi-gcc"):
             missing.append("arm-none-eabi-gcc (arm-none-eabi-gcc or arm-none-eabi-toolchain)")
     
-    try:
-        result = subprocess.run(
-            ["pkg-config", "--exists", "libusb-1.0"],
-            capture_output=True
-        )
-        if result.returncode != 0:
-            missing.append("libusb-1.0-dev or libusb1-devel")
-    except FileNotFoundError:
-        if not Path("/usr/include/libusb-1.0").exists() and \
-           not Path("/usr/local/include/libusb-1.0").exists():
-            missing.append("libusb-1.0-dev or libusb1-devel")
+    if not _libusb_available():
+        missing.append("libusb-1.0-dev or libusb1-devel")
     
+    return len(missing) == 0, missing, warnings
+
+
+def check_macos_dependencies(require_ext_editor: bool = False) -> Tuple[bool, List[str], List[str]]:
+    """Check for required macOS dependencies."""
+    missing = []
+    warnings = []
+
+    required_tools = {
+        "cc": "Xcode Command Line Tools",
+        "make": "Xcode Command Line Tools",
+    }
+
+    for tool, package in required_tools.items():
+        if not shutil.which(tool):
+            missing.append(f"{tool} ({package})")
+
+    if not _libusb_available():
+        missing.append("libusb (brew install libusb)")
+
+    if not _check_payloads_exist():
+        arm_dirs: List[Path] = []
+        for prefix in _homebrew_prefix_candidates():
+            arm_dirs.append(prefix / "bin")
+            arm_dirs.append(prefix / "opt" / "arm-none-eabi-gcc" / "bin")
+        if not _find_executable(("arm-none-eabi-gcc",), tuple(arm_dirs)):
+            missing.append("arm-none-eabi-gcc (brew install arm-none-eabi-gcc)")
+
+    if require_ext_editor and not _find_debugfs_executable():
+        missing.append("debugfs (brew install e2fsprogs; required on macOS to edit /var safely)")
+    elif not _find_debugfs_executable():
+        warnings.append("debugfs (e2fsprogs) - required only when editing mode.json on macOS")
+
+    if not shutil.which("ioreg") and not shutil.which("system_profiler"):
+        warnings.append("ioreg/system_profiler (optional, used for USB APX detection)")
+
     return len(missing) == 0, missing, warnings
 
 
@@ -206,6 +335,36 @@ def check_windows_dependencies() -> Tuple[bool, List[str], List[str]]:
     return len(missing) == 0, missing, warnings
 
 
+def check_dependencies(require_ext_editor: bool = False) -> Tuple[bool, List[str], List[str]]:
+    """Check dependencies for the current platform."""
+    system = platform.system()
+    if system == "Linux":
+        return check_linux_dependencies()
+    if system == "Darwin":
+        return check_macos_dependencies(require_ext_editor=require_ext_editor)
+    if system == "Windows":
+        return check_windows_dependencies()
+    return False, [f"Unsupported OS: {system}"], []
+
+
+def report_dependency_check(require_ext_editor: bool = False) -> bool:
+    """Run dependency checks and print a consistent report."""
+    sys_info = get_system_info()
+    print_step(0, 6, "Checking dependencies")
+
+    deps_ok, missing, warnings = check_dependencies(require_ext_editor=require_ext_editor)
+    if not deps_ok:
+        print_install_instructions(sys_info["os"], missing, warnings)
+        return False
+
+    if warnings:
+        for warn in warnings:
+            print_warning(f"Optional: {warn}")
+
+    print_success("All required dependencies found!")
+    return True
+
+
 def print_install_instructions(system: str, missing: List[str], warnings: List[str] = None):
     """Print installation instructions for missing dependencies"""
     if missing:
@@ -227,34 +386,44 @@ def print_install_instructions(system: str, missing: List[str], warnings: List[s
                 distro = "arch"
             elif Path("/etc/debian_version").exists():
                 distro = "debian"
-        elif Path("/etc/fedora-release").exists():
-            distro = "fedora"
-        
-        if distro == "arch":
-            print(f"""
+
+            elif Path("/etc/fedora-release").exists():
+                distro = "fedora"
+
+            if distro == "arch":
+                print(f"""
   {Colors.CYAN}# Arch/CachyOS/Manjaro:{Colors.RESET}
   sudo pacman -S --needed base-devel libusb git arm-none-eabi-gcc arm-none-eabi-newlib
 """)
-        elif distro == "debian":
-            print(f"""
+            elif distro == "debian":
+                print(f"""
   {Colors.CYAN}# Ubuntu/Debian:{Colors.RESET}
   sudo apt update
   sudo apt install build-essential libusb-1.0-0-dev git gcc-arm-none-eabi libnewlib-arm-none-eabi
 """)
-        elif distro == "fedora":
-            print(f"""
+            elif distro == "fedora":
+                print(f"""
   {Colors.CYAN}# Fedora:{Colors.RESET}
   sudo dnf groupinstall "Development Tools"
   sudo dnf install libusb1-devel arm-none-eabi-gcc-cs arm-none-eabi-newlib
 """)
-        else:
-            print(f"""
+            else:
+                print(f"""
   {Colors.CYAN}# Generic:{Colors.RESET}
   Install: build-essential, libusb-1.0-dev, git, arm-none-eabi-gcc
 """)
-    
-    elif system == "Windows":
-        print(f"""
+        elif system == "Darwin":
+            print(f"""
+  {Colors.CYAN}# macOS:{Colors.RESET}
+  xcode-select --install
+  brew install libusb pkgconf arm-none-eabi-gcc e2fsprogs
+
+  {Colors.CYAN}# e2fsprogs is keg-only; the launcher adds it automatically.{Colors.RESET}
+  {Colors.CYAN}# If running python directly, add this before launching:{Colors.RESET}
+  export PATH="$(brew --prefix)/opt/e2fsprogs/sbin:$PATH"
+""")
+        elif system == "Windows":
+            print(f"""
   {Colors.CYAN}Option 1 - MSYS2 (Recommended):{Colors.RESET}
   1. Download MSYS2 from https://www.msys2.org/
   2. Open MSYS2 MINGW64 terminal and run:
@@ -265,6 +434,8 @@ def print_install_instructions(system: str, missing: List[str], warnings: List[s
   1. Install WSL2: wsl --install
   2. Run this tool inside WSL with Linux dependencies
 """)
+        else:
+            print("  Unsupported OS. Please use Linux, macOS, or Windows/MSYS2.")
 
 
 
@@ -330,6 +501,8 @@ def build_shofel(force_rebuild: bool = False) -> bool:
                     print(f"  {Colors.CYAN}Ubuntu/Debian:{Colors.RESET} sudo apt install gcc-arm-none-eabi libnewlib-arm-none-eabi")
                 elif Path("/etc/fedora-release").exists():
                     print(f"  {Colors.CYAN}Fedora:{Colors.RESET} sudo dnf install arm-none-eabi-gcc-cs arm-none-eabi-newlib")
+                elif platform.system() == "Darwin":
+                    print(f"  {Colors.CYAN}macOS:{Colors.RESET} brew install arm-none-eabi-gcc")
                 else:
                     print(f"  Install arm-none-eabi-gcc for your distribution")
                 
@@ -391,6 +564,45 @@ def detect_jibo_rcm() -> bool:
         print_warning("Cannot detect USB devices. Please ensure Jibo is in RCM mode.")
         print_info("The tool will attempt to connect anyway.")
         return True  # Let shofel try
+
+    elif platform.system() == "Darwin":
+        vendor_dec = str(JIBO_RCM_VENDOR_ID)
+        product_dec = str(JIBO_RCM_PRODUCT_ID)
+
+        if shutil.which("ioreg"):
+            try:
+                result = run_command(
+                    ["ioreg", "-p", "IOUSB", "-l", "-w", "0"],
+                    capture_output=True,
+                    check=False,
+                )
+                output = result.stdout
+                if (
+                    f'"idVendor" = {vendor_dec}' in output
+                    and f'"idProduct" = {product_dec}' in output
+                ):
+                    print_success("Found Jibo in RCM mode! (macOS USB registry)")
+                    return True
+            except Exception as e:
+                print_warning(f"ioreg USB detection failed: {e}")
+
+        if shutil.which("system_profiler"):
+            try:
+                result = run_command(
+                    ["system_profiler", "SPUSBDataType"],
+                    capture_output=True,
+                    check=False,
+                )
+                output = result.stdout.lower()
+                if "0x0955" in output and "0x7740" in output:
+                    print_success("Found Jibo in RCM mode! (system_profiler)")
+                    return True
+            except Exception as e:
+                print_warning(f"system_profiler USB detection failed: {e}")
+
+        print_warning("Jibo not found in RCM mode")
+        print_info("On macOS, System Information > USB should show NVIDIA/APX with Vendor ID 0x0955 and Product ID 0x7740.")
+        return False
     
     elif platform.system() == "Windows":
         print_warning("Windows USB detection - please ensure Zadig drivers are installed")
@@ -714,11 +926,7 @@ def modify_partition_mounted(partition_path: Path) -> bool:
 
 def _find_debugfs_executable() -> Optional[str]:
     """Find a usable debugfs executable (e2fsprogs)."""
-    for candidate in ("debugfs", "debugfs.exe"):
-        path = shutil.which(candidate)
-        if path:
-            return path
-    return None
+    return _find_executable(("debugfs", "debugfs.exe"), _debugfs_search_dirs())
 
 
 def modify_partition_debugfs(partition_path: Path) -> bool:
@@ -816,6 +1024,8 @@ def emmc_read_to_file(output_path: Path, start_sector: int, num_sectors: int) ->
     if not shofel.exists():
         print_error("shofel2_t124 not found. Please build it first.")
         return False
+    if not validate_emmc_sector_range(start_sector, num_sectors):
+        return False
 
     try:
         cmd = [
@@ -828,10 +1038,55 @@ def emmc_read_to_file(output_path: Path, start_sector: int, num_sectors: int) ->
         if platform.system() == "Linux":
             cmd = ["sudo"] + cmd
         subprocess.run(cmd, cwd=SHOFEL_DIR, check=True)
+        pause_for_rcm_reenumeration()
         return output_path.exists()
     except subprocess.CalledProcessError as e:
         print_error(f"EMMC_READ failed: {e}")
         return False
+
+
+def validate_emmc_sector_range(start_sector: int, num_sectors: int) -> bool:
+    """Reject obviously invalid eMMC ranges before invoking Shofel."""
+    if start_sector < 0:
+        print_error(f"Invalid start sector: {start_sector}")
+        return False
+    if num_sectors <= 0:
+        print_error(f"Invalid sector count: {num_sectors}")
+        return False
+    if start_sector + num_sectors > EMMC_TOTAL_SECTORS:
+        print_error(
+            f"Refusing out-of-range eMMC access: start=0x{start_sector:x}, "
+            f"sectors=0x{num_sectors:x}, limit=0x{EMMC_TOTAL_SECTORS:x}"
+        )
+        return False
+    return True
+
+
+def validate_sector_aligned_file(input_path: Path) -> Optional[int]:
+    """Return sector count for a non-empty 512-byte aligned image, else None."""
+    if not input_path.exists():
+        print_error(f"Input file not found: {input_path}")
+        return None
+
+    size = input_path.stat().st_size
+    if size <= 0:
+        print_error(f"Refusing to write empty file: {input_path}")
+        return None
+    if size % EMMC_SECTOR_SIZE != 0:
+        print_error(
+            f"Refusing to write non-sector-aligned file: {input_path} "
+            f"({size} bytes, sector size {EMMC_SECTOR_SIZE})"
+        )
+        return None
+
+    return size // EMMC_SECTOR_SIZE
+
+
+def pause_for_rcm_reenumeration() -> None:
+    """Give macOS/libusb a moment after the payload resets back into APX/RCM."""
+    if platform.system() == "Darwin":
+        import time
+        time.sleep(1.5)
 
 
 def emmc_write_file(input_path: Path, start_sector: int) -> bool:
@@ -839,6 +1094,12 @@ def emmc_write_file(input_path: Path, start_sector: int) -> bool:
     shofel = get_shofel_path()
     if not shofel.exists():
         print_error("shofel2_t124 not found. Please build it first.")
+        return False
+
+    num_sectors = validate_sector_aligned_file(input_path)
+    if num_sectors is None:
+        return False
+    if not validate_emmc_sector_range(start_sector, num_sectors):
         return False
 
     try:
@@ -851,6 +1112,7 @@ def emmc_write_file(input_path: Path, start_sector: int) -> bool:
         if platform.system() == "Linux":
             cmd = ["sudo"] + cmd
         subprocess.run(cmd, cwd=SHOFEL_DIR, check=True)
+        pause_for_rcm_reenumeration()
         return True
     except subprocess.CalledProcessError as e:
         print_error(f"EMMC_WRITE failed: {e}")
@@ -951,6 +1213,8 @@ def dump_emmc(output_path: Path, start_sector: int = 0, num_sectors: int = EMMC_
     if not shofel.exists():
         print_error("shofel2_t124 not found. Please build it first.")
         return False
+    if not validate_emmc_sector_range(start_sector, num_sectors):
+        return False
     
     print_info(f"Dumping {num_sectors} sectors ({num_sectors * 512 / 1024 / 1024 / 1024:.1f} GB)...")
     print_info("This will take approximately 2-4 hours. Please be patient.")
@@ -969,6 +1233,7 @@ def dump_emmc(output_path: Path, start_sector: int = 0, num_sectors: int = EMMC_
             cmd = ["sudo"] + cmd
         
         subprocess.run(cmd, cwd=SHOFEL_DIR, check=True)
+        pause_for_rcm_reenumeration()
         
         if output_path.exists():
             size_gb = output_path.stat().st_size / (1024 * 1024 * 1024)
@@ -994,6 +1259,12 @@ def write_partition_to_emmc(partition_path: Path, start_sector: int) -> bool:
     if not shofel.exists():
         print_error("shofel2_t124 not found")
         return False
+
+    num_sectors = validate_sector_aligned_file(partition_path)
+    if num_sectors is None:
+        return False
+    if not validate_emmc_sector_range(start_sector, num_sectors):
+        return False
     
     print_info(f"Writing to sector 0x{start_sector:x}...")
     print_warning("DO NOT disconnect Jibo during this process!")
@@ -1010,6 +1281,7 @@ def write_partition_to_emmc(partition_path: Path, start_sector: int) -> bool:
             cmd = ["sudo"] + cmd
         
         subprocess.run(cmd, cwd=SHOFEL_DIR, check=True)
+        pause_for_rcm_reenumeration()
         
         print_success("Partition written successfully!")
         return True
@@ -1025,6 +1297,17 @@ def verify_write(partition_path: Path, start_sector: int, num_sectors: int) -> b
     
     shofel = get_shofel_path()
     verify_path = WORK_DIR / "verify_partition.bin"
+    expected_sectors = validate_sector_aligned_file(partition_path)
+    if expected_sectors is None:
+        return False
+    if expected_sectors != num_sectors:
+        print_error(
+            f"Verification size mismatch: file has {expected_sectors} sectors, "
+            f"expected {num_sectors}"
+        )
+        return False
+    if not validate_emmc_sector_range(start_sector, num_sectors):
+        return False
     
     print_info("Reading back partition for verification...")
     
@@ -1041,6 +1324,7 @@ def verify_write(partition_path: Path, start_sector: int, num_sectors: int) -> b
             cmd = ["sudo"] + cmd
         
         subprocess.run(cmd, cwd=SHOFEL_DIR, check=True)
+        pause_for_rcm_reenumeration()
         
         with open(partition_path, "rb") as f:
             original_hash = hashlib.md5(f.read()).hexdigest()
@@ -1073,22 +1357,8 @@ def run_full_mod(args) -> bool:
     if sys_info['is_wsl']:
         print_info("Running in WSL - USB passthrough may require additional setup")
     
-    print_step(0, 6, "Checking dependencies")
-    
-    if sys_info['os'] == "Linux":
-        deps_ok, missing, warnings = check_linux_dependencies()
-    else:
-        deps_ok, missing, warnings = check_windows_dependencies()
-    
-    if not deps_ok:
-        print_install_instructions(sys_info['os'], missing, warnings)
+    if not report_dependency_check(require_ext_editor=True):
         return False
-    
-    if warnings:
-        for warn in warnings:
-            print_warning(f"Optional: {warn}")
-    
-    print_success("All required dependencies found!")
     
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     
@@ -1185,6 +1455,11 @@ def run_dump_only(args) -> bool:
     """Only dump the eMMC without modding"""
     print_banner()
     print_info("Running in dump-only mode")
+    sys_info = get_system_info()
+    print_info(f"System: {sys_info['os']} ({sys_info['arch']})")
+
+    if not report_dependency_check(require_ext_editor=False):
+        return False
     
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     
@@ -1203,6 +1478,11 @@ def run_write_only(args) -> bool:
     """Write a pre-modified partition to Jibo"""
     print_banner()
     print_info("Running in write-only mode")
+    sys_info = get_system_info()
+    print_info(f"System: {sys_info['os']} ({sys_info['arch']})")
+
+    if not report_dependency_check(require_ext_editor=False):
+        return False
     
     partition_path = Path(args.partition)
     if not partition_path.exists():
@@ -1223,6 +1503,11 @@ def run_mode_json_only(args) -> bool:
     """Fast path: dump only GPT + /var, modify /var/jibo/mode.json, and write back minimal changes."""
     print_banner()
     print_info("Running in mode-json-only mode (GPT + /var only)")
+    sys_info = get_system_info()
+    print_info(f"System: {sys_info['os']} ({sys_info['arch']})")
+
+    if not report_dependency_check(require_ext_editor=True):
+        return False
 
     WORK_DIR.mkdir(parents=True, exist_ok=True)
 
