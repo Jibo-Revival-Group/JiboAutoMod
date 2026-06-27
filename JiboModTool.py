@@ -1,9 +1,10 @@
+import os
 import platform
 import sys
 import subprocess
-from importlib.metadata import requires, version, PackageNotFoundError
+import importlib
 from packaging.requirements import Requirement
-
+from importlib.metadata import requires, version, PackageNotFoundError
 
 OS_NAME = "NOS"
 OS_VERSION = "NOVER"
@@ -72,6 +73,33 @@ def get_os():
     else:
         return os_name
 
+def load_platform_module(PLATFORM):
+    os_name , os_version = PLATFORM
+
+
+    os_dir = os.path.join("Platform",os_name)
+    if not os.path.isdir(os_dir):
+        print(f"[  ] (@load_platform_module) Critical Error: Operating System: {os_name} is not supported yet")
+        print(f"[  ] You can be the first one to contribute for {os_name} {os_version}! , Create a PR over at: ")
+        print("[  ] https://github.com/Jibo-Revival-Group/JiboAutoMod or Let us know by making a issue there! ")
+
+    specific_module_path = f"Platform.{os_name}.{os_version}"
+    try:
+        platform_module = importlib.import_module(specific_module_path)
+        print(f"[ 󰏖 ] Loaded denfinitions for {os_name} thats build for {os_version}!")
+        return platform_module
+    except ModuleNotFoundError as error:
+        if error.name == specific_module_path:
+            default_module_path = f"Platform.{os_name}.Default"
+            try:
+                platform_module = importlib.import_module(default_module_path)
+                print(f"[  ] Found generic denfinitios for {os_name}")
+                return platform_module
+            except ModuleNotFoundError:
+                print(f"[  ] (@load_platform_module) Critical Error : Failed to find Default denfinitions for {os_name}, maybe re-pull source?")
+                sys.exit(1)
+        else:
+            raise error
 
 
 print("Jibo Modding tool v2")
@@ -87,5 +115,11 @@ PLATFORM = get_os()
 
 
 
-print("Detected os : ", PLATFORM[0])
-print("")
+print("[  ] Detected os : ", PLATFORM[0])
+print("[  ] Checking / Generating build enviroment")
+
+
+tool = load_platform_module(PLATFORM)
+
+tool.test()
+
