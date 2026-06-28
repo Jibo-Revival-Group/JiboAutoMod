@@ -8,6 +8,71 @@ SHOFEL_BINARY = os.path.join(SHOFEL_DIR, "shofel2_t124")
 
 
 
+
+def begin_dump(StartSector=0x0, EndSector=0x1D60000 ):
+    dump_dir = "dump"
+    try:
+        if not os.path.exists(dump_dir):
+            os.makedirs(dump_dir)
+            print(f"[   ] Created directory {dump_dir}!")
+        else:
+            print(f"[   ] Directory {dump_dir} already exists!")
+    except Exception as error:
+        print(f"[  ] Could not create {dump_dir}!, exiting...")
+        sys.exit(1)
+
+
+    if not os.path.isdir(SHOFEL_DIR):
+         print(f"[ 󱄌 ] Error : Shofel directory wasnt found inside {SHOFEL_DIR}, exiting...")
+         sys.exit(1)
+    print(f"[  󰥥] Starting Dump using Shofel2")
+    
+    cmd = [ "sudo" , "./shofel2_t124" , "EMMC_READ" , str(StartSector) , str(EndSector) , "../dump/jibo_dump.bin"]
+
+    try:
+        subprocess.check_call(cmd, cwd=SHOFEL_DIR)
+        print("\n" + "="*50)
+        print(f"[   ] EMMC Dump complete!")
+        print(f"[   ] EMMC Dump saved under: dump/jibo_dump.bin")
+        print("\n" + "="*50)
+        return True
+    except subprocess.CalledProcessError:
+        print("[ 󱄌 ] Error : Shofel read operation was interrupted.")
+        return False
+    except FileNotFound:
+        print("[ 󱄌 ] Error : Shofel2 wasnt found in the Shofel directory, did you build?.")
+        return False
+
+
+
+        
+
+
+
+
+
+def is_jibo_present():
+    target_id = "0955:7740"
+    try:
+        result = subprocess.run(["lsusb"], capture_output=True, text=True, check=True)
+
+        if target_id in result.stdout:
+            print("[   ] Jibo APX Detected!")
+            return True
+        print("[   ] No device, Make sure youre connected to USB and in RCM mode!")
+        return False
+
+    except(subprocess.CalledProcessError, FileNotFound):
+        print(f"[  ] (@Linux/Cachy:mH*jd) Critical Error: Failed to run lsusb, check usbutils are installed exiting...")
+        sys.exit(1)
+
+
+
+
+
+
+
+
 def build_shofel():
     if not os.path.isdir(SHOFEL_DIR):
         print(f"[ 󱄌 ] Error : Shofel directory wasnt found inside {SHOFEL_DIR}")

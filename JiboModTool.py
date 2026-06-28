@@ -1,3 +1,4 @@
+import time
 import os
 import platform
 import sys
@@ -135,6 +136,28 @@ if not tool.check_shofel_built():
         sys.exit(1)
 
 print("[  ] Shofel2 is ready for excecurion!")
+print("[  ] Scanning for Jibo (Nvidia APX)")
+
+timeout_attempts = 100
+jibo_connected = False
+while (timeout_attempts >= 0) and not jibo_connected:
+    timeout_attempts = timeout_attempts - 1
+    jibo_connected = tool.is_jibo_present()
+    time.sleep(1)
+if timeout_attempts <= 0:
+    print("[  ] Timmed out searching for jibo")
+
+
+emmc_dumped = tool.begin_dump()
+if not emmc_dumped:
+    print(f"[  ] Error: Dumping process failed... exiting")
+    sys.exit(1)
+
+print("[  ] Dump COMPLETE!")
+
+
+
+
 
 
 
