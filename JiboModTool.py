@@ -112,7 +112,7 @@ print("Initialising python dependencies...")
 
 check_py_dependencies()
 PLATFORM = get_os()
-
+        
 
 
 print("[  ] Detected os : ", PLATFORM[0])
@@ -125,8 +125,16 @@ tool.load_msg()
 deps = tool.check_build_dependencies()
 tool.install_build_dependencies(deps)
 
+print("[  ] Build enviroment is ready!")
+print("[  ] Checking for Shofel2")
+ 
+if not tool.check_shofel_built():
+    shofel_build = tool.build_shofel()
+    if not shofel_build:
+        print("[  ] (@if not shofel_build) Critical Error: Shofel Building proceedure failed, cannot proceed!")
+        sys.exit(1)
 
-
+print("[  ] Shofel2 is ready for excecurion!")
 
 
 
