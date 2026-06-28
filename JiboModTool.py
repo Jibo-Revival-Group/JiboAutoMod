@@ -93,7 +93,7 @@ def load_platform_module(PLATFORM):
             default_module_path = f"Platform.{os_name}.Default"
             try:
                 platform_module = importlib.import_module(default_module_path)
-                print(f"[  ] Found generic denfinitios for {os_name}")
+                print(f"[  ] Found generic denfinitios for {os_name}, should work for {os_version}")
                 return platform_module
             except ModuleNotFoundError:
                 print(f"[  ] (@load_platform_module) Critical Error : Failed to find Default denfinitions for {os_name}, maybe re-pull source?")
@@ -121,5 +121,16 @@ print("[  ] Checking / Generating build enviroment")
 
 tool = load_platform_module(PLATFORM)
 
-tool.test()
+tool.load_msg()
+deps = tool.check_build_dependencies()
+if deps:
+    tool.dummy()
+
+
+
+
+
+
+
+
 
