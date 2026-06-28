@@ -123,8 +123,7 @@ tool = load_platform_module(PLATFORM)
 
 tool.load_msg()
 deps = tool.check_build_dependencies()
-if deps:
-    tool.dummy()
+tool.install_build_dependencies(deps)
 
 
 
