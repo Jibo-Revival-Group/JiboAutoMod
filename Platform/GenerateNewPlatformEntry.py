@@ -97,7 +97,7 @@ def ensure_platform_environment(PLATFORM):
 
 
 
-
+print(">>>> VERSION IS 0.1a")
 current_platform = get_os()
 
 

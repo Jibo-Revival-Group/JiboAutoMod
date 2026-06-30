@@ -1,3 +1,4 @@
+# PLEASE FOR THE LOVE THAT IS ALL SPREAD THROUGH THE UNIVERSE GIVE ME A READ!!!!!
 # =====================================================
 # This is a TEMPLATE to be used to implement Jibo Modding Tool functionality
 # to other systems. Im guessing you probably generated this using the generator so...
@@ -22,6 +23,12 @@
 #
 # 7. Once you have implemented everything , hit a PR and well merge it in aassuming everything works :)
 # =====================================================
+
+
+
+# TEMPLATE VERSION => [ 0.1a ]
+
+
 
 
 # ========== PLATFROM VARS

@@ -103,7 +103,7 @@ def load_platform_module(PLATFORM):
             raise error
 
 
-print("Jibo Modding tool v2")
+print("Jibo Modding tool v2 | RELEASE 0.1a")
 print("Use nerdfont as a font if youre missing icons")
 print("If your distro/os isnt supported you can contribute your own config to: ")
 print("https://github.com/Jibo-Revival-Group/JiboAutoMod")
