@@ -1,2 +1,52 @@
-TEMP!!!
+# =====================================================
+# This is a TEMPLATE to be used to implement Jibo Modding Tool functionality
+# to other systems. Im guessing you probably generated this using the generator so...
+# to start you off :
+#
+#
+# THIS TEMPLATE IS SUBJECT TO LARGE CHANGES UPON FURTHER UPDATES , KEEP THAT IN MIND!
+#
+#
+# 1. First make sure the template version matches the Jibo Modding Tool Version (Shown uppon launch)
+# 2. Then make sure the Documentation* version is matching with the Template & JMT Version!! 
+#    This is importans because function denfinitons and standards might change during development
+# 3. Make >>> SURE <<< youre in a different branch or you make a pull request, NEVER push to main (currently : DEV)
+#   3,5. If you push to a different branch , go under something like /Platforms/SomeRandomDOSversionCuzIcan
+# 4. after you have all that sure and setup , begin implementing the functions below (and variables) as required
+#    (I probably dont have to note that but of course you should and i encourage to make your own functions and valriables although
+#     try to keep the implementation within one script)
+# 5. Documentation is under ../Docs/ and be mindful of how each one is handled by the JMT
+#
+# 6. For any questions , please FOR THE LOVE OF EVERYTHING MAKE AN ISSUE ON GITHUB, LIKE IM BEGGING YOU!!!!! LETS TRY TO KEEP THE DISCORD CLEAN 
+#   6,5. Making an issue ong github / questiong helps me and everyone who maintains this understand the issue better and in many cases faster to resolve#        and also it doesnt flood the discord channel (and makes it accessible for people who dont hav discord) SO PLEAAAAASE MAKE ISSUES ON GITHUB!!
+#
+# 7. Once you have implemented everything , hit a PR and well merge it in aassuming everything works :)
+# =====================================================
+
+
+# ========== PLATFROM VARS
+SHOFEL_DIR = os.path.join(os.getcwd(), "Shofel")
+SHOFEL_BINARY = os.path.join(SHOFEL_DIR, "shofel2_t124")
+
+
+
+# ========== PLATFROM FUNCTIONS
+def load_msg():
+
+def dummy():
+
+def begin_dump(StartSector=0x0, EndSector=0x1D60000 ):
+
+def is_jibo_present():
+
+def build_shofel():
+
+def check_shofel_built():
+
+def install_build_dependencies(missing_packages):
+
+def check_build_dependencies():
+
+
+
 
