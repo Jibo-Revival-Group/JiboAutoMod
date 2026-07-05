@@ -153,8 +153,7 @@ else:
     print("[  ] Skipped Shofel2 from config.cfg , proceeding with 'dump complete'")
 print("[  ] Dump COMPLETE!")
 
-
-
+tool.extract_var_partition()
 
 
 

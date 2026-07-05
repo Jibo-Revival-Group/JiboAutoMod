@@ -6,7 +6,32 @@ import sys
 SHOFEL_DIR = os.path.join(os.getcwd(), "Shofel")
 SHOFEL_BINARY = os.path.join(SHOFEL_DIR, "shofel2_t124")
 
+def extract_var_partition(image_path="../dump/jibo_dump.bin", output_path="../dump/jibo_var.bin", StartSector=8294434,EndSector=9318433,sector_size=512):
+    sector_count = (EndSector - StartSector) +x1
 
+    byte_skip = StartSector * sector_size
+    byte_count = sector_count * sector_size
+
+    print("[󰥨  ] Calculating offsets...")
+    print(f"[󰥨  ] Skipping... {StartSector} sectors ({byte_skip} bytes)")
+    print(f"[󰥨  ] Reading... {sector_count} sectors ({byte_count} bytes)")
+
+    try:
+        with open(image_path, "rb") as in_file:
+            in_file.seek(byte_skip)
+            print(f"[  󰥥] Extracting partition to {output_path}")
+
+            partition_data = in_file.read(byte_count)
+        with open(output_path, "wb") as out_file:
+            out_file.write(partition_data)
+
+        print("[ & ] Success! Partition extracted!")
+
+    except FileNotFound:
+        print(f"[ 󱄌 ] Error : dump wasnt found inside {image_path}, exiting...")
+        sys.exit(1)
+    except Exception as e:
+        print(f"[  ] Critical error : Unhandled Exception by @extract_var_partition | {e} , quitting... ") 
 
 
 def begin_dump(StartSector=0x0, EndSector=0x1D60000 ):
