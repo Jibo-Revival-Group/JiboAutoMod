@@ -4,16 +4,14 @@ import platform
 import sys
 import subprocess
 import importlib
+import config
 from packaging.requirements import Requirement
 from importlib.metadata import requires, version, PackageNotFoundError
+
 
 OS_NAME = "NOS"
 OS_VERSION = "NOVER"
 PLATFORM = (OS_NAME, OS_VERSION)
-
-
-
-
 
 def check_py_dependencies(requirements_file="requirements.txt"):
     try:
@@ -110,7 +108,6 @@ print("https://github.com/Jibo-Revival-Group/JiboAutoMod")
 print("Initialising python dependencies...")
 
 
-
 check_py_dependencies()
 PLATFORM = get_os()
         
@@ -128,31 +125,32 @@ tool.install_build_dependencies(deps)
 
 print("[  ] Build enviroment is ready!")
 print("[  ] Checking for Shofel2")
- 
-if not tool.check_shofel_built():
-    shofel_build = tool.build_shofel()
-    if not shofel_build:
-        print("[  ] (@if not shofel_build) Critical Error: Shofel Building proceedure failed, cannot proceed!")
+if (not config.SKIP_SHOFEL): 
+    if not tool.check_shofel_built():
+        shofel_build = tool.build_shofel()
+        if not shofel_build:
+            print("[  ] (@if not shofel_build) Critical Error: Shofel Building proceedure failed, cannot proceed!")
+            sys.exit(1)
+    
+    print("[  ] Shofel2 is ready for excecurion!")
+    print("[  ] Scanning for Jibo (Nvidia APX)")
+    
+    timeout_attempts = 100
+    jibo_connected = False
+    while (timeout_attempts >= 0) and not jibo_connected:
+        timeout_attempts = timeout_attempts - 1
+        jibo_connected = tool.is_jibo_present()
+        time.sleep(1)
+    if timeout_attempts <= 0:
+        print("[  ] Timmed out searching for jibo")
+    
+    
+    emmc_dumped = tool.begin_dump()
+    if not emmc_dumped:
+        print(f"[  ] Error: Dumping process failed... exiting")
         sys.exit(1)
-
-print("[  ] Shofel2 is ready for excecurion!")
-print("[  ] Scanning for Jibo (Nvidia APX)")
-
-timeout_attempts = 100
-jibo_connected = False
-while (timeout_attempts >= 0) and not jibo_connected:
-    timeout_attempts = timeout_attempts - 1
-    jibo_connected = tool.is_jibo_present()
-    time.sleep(1)
-if timeout_attempts <= 0:
-    print("[  ] Timmed out searching for jibo")
-
-
-emmc_dumped = tool.begin_dump()
-if not emmc_dumped:
-    print(f"[  ] Error: Dumping process failed... exiting")
-    sys.exit(1)
-
+else:
+    print("[  ] Skipped Shofel2 from config.cfg , proceeding with 'dump complete'")
 print("[  ] Dump COMPLETE!")
 
 
