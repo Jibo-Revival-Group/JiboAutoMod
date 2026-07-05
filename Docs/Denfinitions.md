@@ -200,3 +200,36 @@ def begin_dump(StartSector=0x0, EndSector=0x1D60000 ):
 
 
 ```
+
+
+## `extract_var_partition(image_path, output_path, start_sector, end_sector, sector_size)`
+
+the command that executes shofel and places the dump in `dump/jibo_dump.bin`
+
+
+| Arguments | Returns                                           | StartSector  | EndSector          | image_path         | output_path       | sector_size |
+| --------- | ------------------------------------------------- | ------------ | ------------------ | ------------------ | ----------------- | ----------- |
+| 5         | bool                                              | HexValue     | HexValue           | String path        | String Path       | Int         |
+|           | true when var partition split AND saved complete! | default: 0x0 | default: 0x1D60000 | dump/jibo_dump.bin | dump/jibo_var.bin | 512         |
+Implementation examples:
+
+```python
+def extract_var_partition(image_path="../dump/jibo_dump.bin", output_path="../dump/jibo_var.bin", StartSector=8294434,EndSector=9318433,sector_size=512):
+    sector_count = (EndSector - StartSector) +x1
+    byte_skip = StartSector * sector_size
+    byte_count = sector_count * sector_size
+    try:
+        with open(image_path, "rb") as in_file:
+            in_file.seek(byte_skip)
+            partition_data = in_file.read(byte_count) #extract to ram (not best approach btw)
+        with open(output_path, "wb") as out_file:
+            out_file.write(partition_data) #write from ram to file
+
+
+
+    except FileNotFound:
+        sys.exit(1) #handle exceptions
+    except Exception as e:
+        print(f"[  ] Critical error : Unhandled Exception by @extract_var_partition | {e} , quitting... ") #All of them !!!
+
+```
