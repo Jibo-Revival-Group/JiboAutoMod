@@ -1,2 +1,4 @@
 *.bak
 jibo_work/
+/__pycache__
+/dump
