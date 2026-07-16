@@ -6,8 +6,8 @@ import sys
 SHOFEL_DIR = os.path.join(os.getcwd(), "Shofel")
 SHOFEL_BINARY = os.path.join(SHOFEL_DIR, "shofel2_t124")
 
-def extract_var_partition(image_path="../dump/jibo_dump.bin", output_path="../dump/jibo_var.bin", StartSector=8294434,EndSector=9318433,sector_size=512):
-    sector_count = (EndSector - StartSector) +x1
+def extract_var_partition(image_path="./dump/jibo_dump.bin", output_path="./dump/jibo_var.bin", StartSector=8294434,EndSector=9318433,sector_size=512):
+    sector_count = (EndSector - StartSector) + 1
 
     byte_skip = StartSector * sector_size
     byte_count = sector_count * sector_size
@@ -172,5 +172,43 @@ def load_msg():
     print("Cachy OS denfinitions!!")
     print(">>>   Arch btw based!   <<<")
 
+def patchDevMode(partition_path, target_json='{"mode":"int-developer"}'):
+   temp_file = "temp_mode.json"
+   internal_path = "/jibo/mode.json"
+    
+    # create the JSON locally
+   with open(temp_file, "w") as f:
+       f.write(target_json)
+       
+   try:
+       print(f"[+] Removing old {internal_path} inside partition...")
+       # debugfs -w (write-mode) -R (run command)
+       subprocess.run([
+           "debugfs", "-w", 
+           "-R", f"rm {internal_path}", 
+           partition_path
+       ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+       
+       print(f"[+] Writing new {internal_path} and updating metadata...")
+       result = subprocess.run([
+           "debugfs", "-w", 
+           "-R", f"write {temp_file} {internal_path}", 
+           partition_path
+       ], capture_output=True, text=True)
+       
+       if result.returncode == 0:
+           print("[+] Success! mode.json updated successfully.")
+           return True
+       else:
+           print(f"[-] Error writing file: {result.stderr}")
+           return False
+           
+   finally:
+       #delete the local temp file
+       if os.path.exists(temp_file):
+           os.remove(temp_file)
+
+
+
 def dummy():
-    print("Do something")
+    print("Do so:mething")

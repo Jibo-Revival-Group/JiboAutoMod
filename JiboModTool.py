@@ -156,6 +156,9 @@ print("[  ] Dump COMPLETE!")
 tool.extract_var_partition()
 
 
+tool.patchDevMode("./dump/jibo_var.bin")
+
+
 
 
 
