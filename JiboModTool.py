@@ -156,7 +156,17 @@ print("[  ] Dump COMPLETE!")
 tool.extract_var_partition()
 
 
-tool.patchDevMode("./dump/jibo_var.bin")
+if not tool.patchDevMode("./dump/jibo_var.bin"):
+    print("[  ] Failed writting JSON file wanna write anyway (y) or exit (n)")
+    response = input(":")
+    if response == "y":
+        pass
+    else:
+        sys.exit(1)
+
+
+        
+
 
 
 

@@ -2,3 +2,4 @@
 jibo_work/
 /__pycache__
 /dump
+/Platform/Linux/__pycache__

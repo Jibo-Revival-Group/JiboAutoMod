@@ -198,7 +198,7 @@ def patchDevMode(partition_path, target_json='{"mode":"int-developer"}'):
        
        if result.returncode == 0:
            print("[+] Success! mode.json updated successfully.")
-           return True
+           return True 
        else:
            print(f"[-] Error writing file: {result.stderr}")
            return False
