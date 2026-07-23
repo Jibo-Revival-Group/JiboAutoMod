@@ -547,7 +547,7 @@ def extract_partition(dump_path: Path, partition: PartitionInfo, output_path: Pa
         return False
 
 
-def modify_mode_json_direct(partition_path: Path) -> bool:
+def modify_mode_json_direct(partition_path: Path, target_mode: str = "int-developer") -> bool:
     """
     Modify mode.json directly in the partition image by searching for the pattern.
     This works on both Linux and Windows without mounting.
@@ -561,13 +561,15 @@ def modify_mode_json_direct(partition_path: Path) -> bool:
         with open(partition_path, "r+b") as f:
             data = bytearray(f.read())
 
+            source_mode = "normal" if target_mode == "int-developer" else "int-developer"
+            new_json = json.dumps({"mode": target_mode}, separators=(",", ":")).encode()
             json_patterns = [
-                (b'{"mode":"normal"}', b'{"mode":"int-developer"}'),
-                (b'{"mode": "normal"}', b'{"mode": "int-developer"}'),
-                (b'{ "mode": "normal" }', b'{"mode":"int-developer"}'),
+                f'{{"mode":"{source_mode}"}}'.encode(),
+                f'{{"mode": "{source_mode}"}}'.encode(),
+                f'{{ "mode": "{source_mode}" }}'.encode(),
             ]
 
-            for old_json, new_json in json_patterns:
+            for old_json in json_patterns:
                 offset = bytes(data).find(old_json)
                 if offset == -1:
                     continue
@@ -602,7 +604,7 @@ def modify_mode_json_direct(partition_path: Path) -> bool:
         return False
 
 
-def modify_partition_mounted(partition_path: Path) -> bool:
+def modify_partition_mounted(partition_path: Path, target_mode: str = "int-developer") -> bool:
     """Modify mode.json by mounting the partition (Linux only)"""
     if platform.system() != "Linux":
         print_error("Filesystem mounting only supported on Linux")
@@ -673,7 +675,7 @@ def modify_partition_mounted(partition_path: Path) -> bool:
             
             print_info(f"Current mode: {content.get('mode', 'unknown')}")
             
-            content["mode"] = "int-developer"
+            content["mode"] = target_mode
             
             temp_json = WORK_DIR / "mode_temp.json"
             with open(temp_json, "w") as f:
@@ -691,7 +693,7 @@ def modify_partition_mounted(partition_path: Path) -> bool:
             except Exception:
                 pass
             
-            print_success("mode.json modified to 'int-developer'")
+            print_success(f"mode.json modified to '{target_mode}'")
             
         else:
             print_error(f"mode.json not found in mounted partition")
@@ -721,7 +723,7 @@ def _find_debugfs_executable() -> Optional[str]:
     return None
 
 
-def modify_partition_debugfs(partition_path: Path) -> bool:
+def modify_partition_debugfs(partition_path: Path, target_mode: str = "int-developer") -> bool:
     """Modify mode.json using debugfs (e2fsprogs) without mounting.
 
     This can work on Windows if the user has MSYS2 e2fsprogs installed (debugfs.exe on PATH).
@@ -769,7 +771,7 @@ def modify_partition_debugfs(partition_path: Path) -> bool:
         print_warning("mode.json content is not valid JSON; refusing to edit")
         return False
 
-    content["mode"] = "int-developer"
+    content["mode"] = target_mode
     new_text = json.dumps(content)
 
     temp_json = WORK_DIR / "mode_temp.json"
@@ -787,23 +789,23 @@ def modify_partition_debugfs(partition_path: Path) -> bool:
     except Exception:
         pass
 
-    print_success("mode.json modified to 'int-developer' (debugfs)")
+    print_success(f"mode.json modified to '{target_mode}' (debugfs)")
     return True
 
 
-def modify_var_partition(partition_path: Path) -> bool:
-    """Modify the var partition to enable developer mode"""
+def modify_var_partition(partition_path: Path, target_mode: str = "int-developer") -> bool:
+    """Modify the var partition to set the requested mode"""
     print_step(4, 6, "Modifying var partition")
 
     if platform.system() == "Linux":
-        if modify_partition_mounted(partition_path):
+        if modify_partition_mounted(partition_path, target_mode):
             return True
         print_warning("Mount-based edit failed; falling back to raw in-place patch")
 
-    if modify_partition_debugfs(partition_path):
+    if modify_partition_debugfs(partition_path, target_mode):
         return True
 
-    if modify_mode_json_direct(partition_path):
+    if modify_mode_json_direct(partition_path, target_mode):
         return True
     
     print_error("Could not modify partition")
@@ -1266,7 +1268,8 @@ def run_mode_json_only(args) -> bool:
     shutil.copy(original_var_path, backup_var_path)
     print_info(f"Backup created: {backup_var_path}")
 
-    if not modify_var_partition(var_partition_path):
+    target_mode = "normal" if args.restore_normal else "int-developer"
+    if not modify_var_partition(var_partition_path, target_mode):
         return False
 
     if not args.skip_detection:
@@ -1289,14 +1292,16 @@ def run_mode_json_only(args) -> bool:
 
     print(f"\n{Colors.GREEN}{Colors.BOLD}Mode.json update complete!{Colors.RESET}")
     print_info(f"Saved originals in: {WORK_DIR}")
-    print_info("If Jibo boots to a checkmark, SSH should work.")
+    print_info(f"mode.json is set to '{target_mode}'.")
+    if target_mode == "int-developer":
+        print_info("If Jibo boots to a checkmark, SSH should work.")
     return True
 
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Jibo Auto-Mod Tool - Automatically enable developer mode on Jibo robots",
+        description="Jibo Auto-Mod Tool - Modify Jibo robots and manage mode.json",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -1304,6 +1309,8 @@ Examples:
   %(prog)s --dump-only          # Only dump eMMC
   %(prog)s --write-partition var.bin --start-sector 0x7E9022
   %(prog)s --dump-path existing_dump.bin   # Use existing dump
+  %(prog)s --mode-json-only     # Set mode.json to int-developer
+  %(prog)s --mode-json-only --restore-normal  # Set mode.json to normal
         """
     )
     
@@ -1333,11 +1340,15 @@ Examples:
                        help="Skip write verification")
     parser.add_argument("--full-var-write", action="store_true", default=False,
                        help="With --mode-json-only: write entire /var partition instead of patch-writing changed sectors")
+    parser.add_argument("--restore-normal", action="store_true",
+                       help="With --mode-json-only: restore /var/jibo/mode.json to normal mode")
     
     args = parser.parse_args()
     
     if args.write_partition and not args.start_sector:
         parser.error("--write-partition requires --start-sector")
+    if args.restore_normal and not args.mode_json_only:
+        parser.error("--restore-normal requires --mode-json-only")
     
     try:
         if args.dump_only:
