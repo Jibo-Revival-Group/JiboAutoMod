@@ -12,6 +12,6 @@
 #include "mini_libusb.h"
 #include "endianness.h"
 
-int send_rcm_cmd( mini_usb_handle *rcm_usb, char* payload_filename, uint32_t payload_thumb_mode );
+int send_rcm_cmd( int rcm_usb, char* payload_filename, uint32_t payload_thumb_mode, int debug );
 
 #endif
