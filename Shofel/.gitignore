@@ -7,5 +7,7 @@ build/
 .*.swp
 *.o
 shofel2_t124
-jibo_full_dump.bin
+jibo_full_dump.bin\
 monitor.sh
+jibo_full_dump.bin\
+jibo_full_dump.bin\

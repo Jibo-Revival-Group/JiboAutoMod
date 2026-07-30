@@ -1,0 +1,1276 @@
+
+U-Boot SPL 2016.05 (Jun 23 2017 - 11:08:55)
+Trying to boot from RAM
+
+
+U-Boot 2016.05 (Jun 23 2017 - 11:08:55 -0700)
+
+TEGRA124
+Model: Avionic Design Kein Baseboard
+Board: Avionic-Design Kein Baseboard, ID: -2
+
+       Watchdog enabled
+DRAM:  2 GiB
+MMC:   Tegra SD/MMC: 0
+In:    serial
+Out:   serial
+Err:   serial
+
+Saving Environment to MMC...
+Writing to MMC(0)... done
+326400 bytes read in 88 ms (3.5 MiB/s)
+play sound
+6264965 bytes read in 218 ms (27.4 MiB/s)
+## Loading kernel from FIT Image at 81000000 ...
+   Using 'tegra124-tobor-aio@1' configuration
+   Verifying Hash Integrity ... sha256,rsa2048:jibo-production+ OK
+   Trying 'kernel@1' kernel subimage
+     Description:  unavailable
+     Type:         Kernel Image
+     Compression:  uncompressed
+     Data Start:   0x810000b8
+     Data Size:    5893952 Bytes = 5.6 MiB
+     Architecture: ARM
+     OS:           Linux
+     Load Address: 0x84000000
+     Entry Point:  0x84000000
+     Hash algo:    sha256
+     Hash value:   55ed0270da19d7c8d1ed002887706894646f902f648c811f992b43dd3c26f894
+   Verifying Hash Integrity ... sha256+ OK
+## Loading fdt from FIT Image at 81000000 ...
+   Using 'tegra124-tobor-aio@1' configuration
+   Trying 'fdt@2' fdt subimage
+     Description:  tegra124-tobor-aio
+     Type:         Flat Device Tree
+     Compression:  uncompressed
+     Data Start:   0x815b556c
+     Data Size:    92838 Bytes = 90.7 KiB
+     Architecture: ARM
+     Hash algo:    sha256
+     Hash value:   11cd5ee8394bc27dbefbc46063f7fda95da7ec07df1feca822c31ad18148bfee
+   Verifying Hash Integrity ... sha256+ OK
+   Booting using the fdt blob at 0x815b556c
+   Loading Kernel Image ... OK
+   Loading Device Tree to 8ffe6000, end 8ffffaa5 ... OK
+
+Starting kernel ...
+
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Initializing cgroup subsys cpuset
+[    0.000000] Initializing cgroup subsys cpu
+[    0.000000] Initializing cgroup subsys cpuacct
+[    0.000000] Linux version 3.10.104 (jon@highst-buildroot) (gcc version 4.9.3 (Buildroot 2015.11) ) #1 SMP PREEMPT Sun Feb 24 16:59:01 EST 2019
+[    0.000000] CPU: ARMv7 Processor [413fc0f3] revision 3 (ARMv7), cr=10c5387d
+[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+[    0.000000] Machine: Avionic Design Meerkat (Device Tree), model: Avionic Design Tobor All In One, serial: 0
+[    0.000000] Tegra reserved memory:
+[    0.000000] LP0:                    00000000 - 00000000
+[    0.000000] Bootloader framebuffer: 00000000 - 00000000
+[    0.000000] Bootloader framebuffer2: 00000000 - 00000000
+[    0.000000] Framebuffer:            fed00000 - ffefffff
+[    0.000000] 2nd Framebuffer:        00000000 - 00000000
+[    0.000000] Carveout:               00000000 - 00000000
+[    0.000000] Vpr:                    00000000 - 00000000
+[    0.000000] Tsec:                   00000000 - 00000000
+[    0.000000] cma: CMA: reserved 16 MiB at ae800000
+[    0.000000] Memory policy: ECC disabled, Data cache writealloc
+[    0.000000] DTS File Name: arch/arm/boot/dts/tegra124-tobor-aio-core.dtsi
+[    0.000000] Tegra12: CPU Speedo value 2235, Soc Speedo value 2220, Gpu Speedo value 2056
+[    0.000000] Tegra12: CPU Speedo ID 5, Soc Speedo ID 0, Gpu Speedo ID 1
+[    0.000000] Tegra12: CPU Process ID 0,Soc Process ID 1,Gpu Process ID 0
+[    0.000000] Tegra Revision: A01 SKU: 0x87 CPU Process: 0 Core Process: 1
+[    0.000000] tegra: PLLP fixed rate: 408000000
+[    0.000000] tegra_clk_shared_bus_user_init: c2bus client se left ON
+[    0.000000] tegra_clk_shared_bus_user_init: c4bus client vi left ON
+[    0.000000] edp: using default cpu edp limits
+[    0.000000] Lowering cpu_lp maximum rate from 1350000000 to 1044000000
+[    0.000000] Lowering sbus maximum rate from 420000000 to 372000000
+[    0.000000] Lowering vic03 maximum rate from 900000000 to 756000000
+[    0.000000] Lowering tsec maximum rate from 900000000 to 756000000
+[    0.000000] Lowering msenc maximum rate from 600000000 to 480000000
+[    0.000000] Lowering se maximum rate from 600000000 to 480000000
+[    0.000000] Lowering vde maximum rate from 600000000 to 480000000
+[    0.000000] Lowering host1x maximum rate from 500000000 to 408000000
+[    0.000000] Lowering vi maximum rate from 700000000 to 600000000
+[    0.000000] Lowering isp maximum rate from 700000000 to 600000000
+[    0.000000] Lowering c4bus maximum rate from 700000000 to 600000000
+[    0.000000] Lowering pll_c maximum rate from 1400000000 to 1066000000
+[    0.000000] Lowering pll_c2 maximum rate from 1200000000 to 1066000000
+[    0.000000] Lowering pll_c3 maximum rate from 1200000000 to 1066000000
+[    0.000000] Lowering hdmi maximum rate from 594000000 to 297000000
+[    0.000000] Lowering sdmmc1 maximum rate from 208000000 to 204000000
+[    0.000000] Lowering sdmmc3 maximum rate from 208000000 to 204000000
+[    0.000000] Lowering gbus maximum rate from 1032000000 to 852000000
+[    0.000000] Lowering cpu_g maximum rate from 3000000000 to 2065500000
+[    0.000000] tegra dvfs: VDD_CPU nominal 1260mV, scaling enabled
+[    0.000000] tegra dvfs: VDD_CORE nominal 1150mV, scaling enabled
+[    0.000000] tegra dvfs: VDD_GPU nominal 1200mV, scaling enabled
+[    0.000000] Switching to timer-based delay loop
+[    0.000000] ------------[ cut here ]------------
+[    0.000000] WARNING: at arch/arm/mach-tegra/clock.c:969 tegra_common_init_clock+0x68/0x88()
+[    0.000000] tegra: spdif_in boot rate 408000000 exceeds max rate 100000000
+[    0.000000] Modules linked in:
+[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 3.10.104 #1
+[    0.000000] [<c0016e2c>] (unwind_backtrace+0x0/0x134) from [<c00130a4>] (show_stack+0x18/0x1c)
+[    0.000000] [<c00130a4>] (show_stack+0x18/0x1c) from [<c005f6d0>] (warn_slowpath_common+0x5c/0x74)
+[    0.000000] [<c005f6d0>] (warn_slowpath_common+0x5c/0x74) from [<c005f720>] (warn_slowpath_fmt+0x38/0x48)
+[    0.000000] [<c005f720>] (warn_slowpath_fmt+0x38/0x48) from [<c0ad3a70>] (tegra_common_init_clock+0x68/0x88)
+[    0.000000] [<c0ad3a70>] (tegra_common_init_clock+0x68/0x88) from [<c0ad30a8>] (tegra12x_init_early+0x108/0x2a8)
+[    0.000000] [<c0ad30a8>] (tegra12x_init_early+0x108/0x2a8) from [<c0ace270>] (setup_arch+0x800/0x82c)
+[    0.000000] [<c0ace270>] (setup_arch+0x800/0x82c) from [<c0acb824>] (start_kernel+0x94/0x334)
+[    0.000000] [<c0acb824>] (start_kernel+0x94/0x334) from [<80008074>] (0x80008074)
+[    0.000000] ---[ end trace 1b75b31a2719ed1c ]---
+[    0.000000] tegra_powergate_init: DONE
+[    0.000000] PERCPU: Embedded 9 pages/cpu @c1e32000 s14848 r8192 d13824 u36864
+[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 517392
+[    0.000000] Kernel command line: console=ttyS0,115200 root=/dev/mmcblk0p2 rw rootwait vt.global_cursor_default=0 net.ifnames=0
+[    0.000000] PID hash table entries: 4096 (order: 2, 16384 bytes)
+[    0.000000] Dentry cache hash table entries: 131072 (order: 7, 524288 bytes)
+[    0.000000] Inode-cache hash table entries: 65536 (order: 6, 262144 bytes)
+[    0.000000] allocated 4192256 bytes of page_cgroup
+[    0.000000] please try 'cgroup_disable=memory' option if you don't want memory cgroups
+[    0.000000] Memory: 2027MB = 2027MB total
+[    0.000000] Memory: 2023116k/2023116k available, 73012k reserved, 1297408K highmem
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+[    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+[    0.000000]     vmalloc : 0xf0000000 - 0xff000000   ( 240 MB)
+[    0.000000]     lowmem  : 0xc0000000 - 0xef800000   ( 760 MB)
+[    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+[    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+[    0.000000]       .text : 0xc0008000 - 0xc0aca238   (11017 kB)
+[    0.000000]       .init : 0xc0acb000 - 0xc0c25a00   (1387 kB)
+[    0.000000]       .data : 0xc0c26000 - 0xc0d1a7d8   ( 978 kB)
+[    0.000000]        .bss : 0xc0d1a7d8 - 0xc0db65fc   ( 624 kB)
+[    0.000000] Preemptible hierarchical RCU implementation.
+[    0.000000] NR_IRQS:960
+[    0.000000] the number of interrupt controllers found is 5
+[    0.000000] Architected local timer running at 12.00MHz (phys).
+[    0.000000] sched_clock: 56 bits at 12MHz, resolution 83ns, wraps every 2863311536128ns
+[    0.000000] Ignoring duplicate/late registration of read_current_timer delay
+[    0.000000] Console: colour dummy device 80x30
+[    0.000442] Calibrating delay loop (skipped), value calculated using timer frequency.. lpj=12000
+[    0.000457] pid_max: default: 32768 minimum: 301
+[    0.000727] Mount-cache hash table entries: 512
+[    0.026597] Initializing cgroup subsys debug
+[    0.026613] Initializing cgroup subsys memory
+[    0.026666] Initializing cgroup subsys devices
+[    0.026684] Initializing cgroup subsys freezer
+[    0.026695] Initializing cgroup subsys blkio
+[    0.026748] CPU: Testing write buffer coherency: ok
+[    0.026789] ftrace: allocating 29679 entries in 58 pages
+[    0.064965] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+[    0.064996] Setting up static identity map for 0xc07cef58 - 0xc07ceff4
+[    0.068997] ftrace: Allocated trace_printk buffers
+[    0.075697] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+[    0.078729] CPU2: thread -1, cpu 2, socket 0, mpidr 80000002
+[    0.081765] CPU3: thread -1, cpu 3, socket 0, mpidr 80000003
+[    0.081966] Brought up 4 CPUs
+[    0.081986] SMP: Total of 4 processors activated.
+[    0.081993] CPU: All CPU(s) started in SVC mode.
+[    0.082923] devtmpfs: initialized
+[    0.090547] pinctrl core: initialized pinctrl subsystem
+[    0.090852] regulator-dummy: no parameters
+[    0.091760] NET: Registered protocol family 16
+[    0.093526] DMA: preallocated 256 KiB pool for atomic coherent allocations
+[    0.094806] tegra_smmu tegra_smmu: Loaded Tegra IOMMU driver
+[    0.095963] console [pstore-1] enabled
+[    0.095993] ramoops: attached 0x200000@0xfeb00000, ecc: 0/0
+[    0.096374] cpuidle: using governor ladder
+[    0.096386] cpuidle: using governor menu
+[    0.107913] tegra124-pinctrl 70000868.pinmux: lookup the user state drive not found
+[    0.107933] tegra124-pinctrl 70000868.pinmux: lookup the user state unused not found
+[    0.108657] gpiochip_add: registered GPIOs 0 to 255 on device: tegra-gpio
+[    0.115064] Wake16 for irq=34
+[    0.121466] platform tegradc.0: IOVA linear map 0xfed00000(1200000)
+[    0.124105] Wake39 for irq=52
+[    0.124721] platform tegra-otg: 4000 1000000
+[    0.124896] Wake40 for irq=53
+[    0.124907] Wake42 for irq=53
+[    0.125185] Wake41 for irq=129
+[    0.125196] Wake43 for irq=129
+[    0.131197] PMC DT attribute suspend_mode=2, board value=3
+[    0.131255] tegra_init_suspend: Suspend mode LP0 requested, no lp0_vec provided by bootlader -- disabling LP0
+[    0.131690] Clear bootloader IO dpd settings
+[    0.131868] tegra-emc 7001b000.memory-controller: Found EMC table for ram-code 0x02
+[    0.132613] tegra: pll_m is selected as scalable EMC clock source
+[    0.132634] Lowering emc maximum rate from 1200000000 to 924000000
+[    0.132651] tegra: validated EMC DFS table
+[    0.132774] tegra_meerkat_edp_init: CPU regulator 12500 mA
+[    0.132786] edp: cpu edp limit: 12500
+[    0.380241] tegra_meerkat_edp_init: GPU regulator 11400 mA
+[    0.380252] edp: gpu edp limit: 11400
+[    0.381191] swapper/0 isomgr_init(): iso emc max clk=924000KHz
+[    0.381202] swapper/0 isomgr_init(): max_iso_bw=7392000KB[    0.381657] tegra11_soctherem_oc_int_init(): OC interrupts are not enabled
+[    0.381875] hw-breakpoint: Debug register access (0xee003e17) caused undefined instruction on CPU 3
+[    0.381881] hw-breakpoint: Debug register access (0xee003e17) caused undefined instruction on CPU 2
+[    0.381887] hw-breakpoint: Debug register access (0xee003e17) caused undefined instruction on CPU 1
+[    0.381891] hw-breakpoint: CPU 2 failed to disable vector catch
+[    0.381850] No ATAGs?
+[    0.381926] hw-breakpoint: Debug register access (0xee003e17) caused undefined instruction on CPU 0
+[    0.382210] mc-err: Started MC error interface!
+[    0.392148] bio: create slab <bio-0> at 0
+[    0.394384] VSYS: 12000 mV 
+[    0.394611] +5V_SOM: 5000 mV 
+[    0.394664] +5V_SOM: supplied by VSYS
+[    0.394898] +3V3_SOM: 3300 mV 
+[    0.394939] +3V3_SOM: supplied by VSYS
+[    0.395179] +5V_EXT: 5000 mV 
+[    0.395221] +5V_EXT: supplied by VSYS
+[    0.395469] +3V3_EXT: 3300 mV 
+[    0.395512] +3V3_EXT: supplied by VSYS
+[    0.395736] +1V8_EXT: 1800 mV 
+[    0.395783] reg-fixed-voltage 69.regulator: Failed to find supply vin
+[    0.395883] reg-fixed-voltage 69.regulator: Failed to register regulator: -517
+[    0.395906] platform 69.regulator: Driver reg-fixed-voltage requests probe deferral
+[    0.396097] HDMI_VCC: 5000 mV 
+[    0.396139] HDMI_VCC: supplied by +5V_EXT
+[    0.396419] +3V3_SD: 3300 mV 
+[    0.396463] +3V3_SD: supplied by +3V3_EXT
+[    0.396694] +1V5_mPCIe: 1500 mV 
+[    0.396737] +1V5_mPCIe: supplied by +3V3_EXT
+[    0.396979] +3V3_mPCIe: 3300 mV 
+[    0.397022] +3V3_mPCIe: supplied by +3V3_EXT
+[    0.397286] USB_CLIENT_VBUS: 5000 mV 
+[    0.397330] USB_CLIENT_VBUS: supplied by +5V_EXT
+[    0.397623] USB1_VCC: 5000 mV 
+[    0.397667] USB1_VCC: supplied by +5V_EXT
+[    0.397932] AMP_EN: 1800 mV 
+[    0.397975] AMP_EN: supplied by +5V_EXT
+[    0.398267] WLAN_EN: 1800 mV 
+[    0.398311] WLAN_EN: supplied by +5V_EXT
+[    0.398587] vana: 2700 mV 
+[    0.398629] vana: supplied by +5V_EXT
+[    0.398871] vdig: 1200 mV 
+[    0.398913] vdig: supplied by +5V_EXT
+[    0.399140] vif: 1800 mV 
+[    0.399182] vif: supplied by +5V_EXT
+[    0.399452] +VDD_MUX: 5000 mV 
+[    0.399496] +VDD_MUX: supplied by +5V_SOM
+[    0.399737] +5V_SYS: 5000 mV 
+[    0.399779] +5V_SYS: supplied by +VDD_MUX
+[    0.400011] +3V3_SYS: 3300 mV 
+[    0.400054] +3V3_SYS: supplied by +3V3_SOM
+[    0.400296] +3V3_RUN: 3300 mV 
+[    0.400340] +3V3_RUN: supplied by +3V3_SYS
+[    0.400604] +3V3_AVDD_HDMI_AP_GATED: 3300 mV 
+[    0.400647] +3V3_AVDD_HDMI_AP_GATED: supplied by +3V3_RUN
+[    0.400830] platform 5.regulator: Driver reg-fixed-voltage requests probe deferral
+[    0.401023] +1V05_RUN_AVDD_HDMI_PLL_AP_GATED: 1050 mV 
+[    0.401069] reg-fixed-voltage 6.regulator: Failed to find supply vin
+[    0.401168] reg-fixed-voltage 6.regulator: Failed to register regulator: -517
+[    0.401190] platform 6.regulator: Driver reg-fixed-voltage requests probe deferral
+[    0.402783] vgaarb: loaded
+[    0.403410] SCSI subsystem initialized
+[    0.403805] usbcore: registered new interface driver usbfs
+[    0.403865] usbcore: registered new interface driver hub
+[    0.403968] usbcore: registered new device driver usb
+[    0.404444] regulator_get() failed for (i2c-0,pull-ups), -19
+[    0.406123] regulator_get() failed for (i2c-1,pull-ups), -19
+[    0.406795] tegra-i2c tegra12-i2c.2: Failed to add I2C adapter
+[    0.406832] platform tegra12-i2c.2: Driver tegra-i2c requests probe deferral
+[    0.407164] regulator_get() failed for (i2c-4,pull-ups), -19
+[    0.407231] Wake18 for irq=118
+[    0.408180] as3722 4-0040: AS3722 ID: ID1:ID2:ID3 = 0x0c:0x01:0x05
+[    0.408198] as3722 4-0040: Device version 1V1 and platform version 1V2
+[    0.408211] as3722 4-0040: Final OTP version 1V2
+[    0.409041] Wake18 for irq=118
+[    0.413107] gpiochip_add: registered GPIOs 1016 to 1023 on device: as3722-gpio
+[    0.413327] as3722-regulator as3722-regulator.0: Consumer cpu does not have device name
+[    0.413370] as3722-regulator as3722-regulator.0: Consumer core does not have device name
+[    0.413486] as3722-regulator as3722-regulator.0: Consumer gpu does not have device name
+[    0.413503] as3722-regulator as3722-regulator.0: Consumer gpu_simon does not have device name
+[    0.414523] +VDD_CPU_AP: 650 <--> 1300 mV at 800 mV 3500 mA 
+[    0.415894] +VDD_CORE: 700 <--> 1350 mV at 1100 mV 3500 mA 
+[    0.417054] +1V35_LP0(sd2): 1450 mV 
+[    0.417119] +1V35_LP0(sd2): supplied by +5V_SYS
+[    0.418000] +1V35_LP0(sd3): no parameters
+[    0.418068] +1V35_LP0(sd3): supplied by +5V_SYS
+[    0.418373] +1V05_RUN: 1050 mV 
+[    0.418432] +1V05_RUN: supplied by +5V_SYS
+[    0.419599] +1V8_VDDIO: 1800 mV 
+[    0.419673] +1V8_VDDIO: supplied by +5V_SYS
+[    0.419966] +VDD_GPU_AP: applied init 1000000uV constraint
+[    0.420830] +VDD_GPU_AP: 650 <--> 1200 mV at 1000 mV 3500 mA 
+[    0.421302] +1V05_RUN_AVDD: 1050 mV at 300 mA 
+[    0.421353] +1V05_RUN_AVDD: supplied by +1V35_LP0(sd2)
+[    0.422266] +1V8_RUN_CAM: 1800 mV at 150 mA 
+[    0.422335] +1V8_RUN_CAM: supplied by +3V3_RUN
+[    0.422970] +1V2_GEN_AVDD: 1200 mV at 150 mA 
+[    0.423024] +1V2_GEN_AVDD: supplied by +1V8_VDDIO
+[    0.424186] +1V05_LDO_VDD_RTC: 1000 mV at 150 mA 
+[    0.424500] AVDD_LVDS_PLL: 1800 <--> 3300 mV at 150 mA 
+[    0.424809] as3722-ldo5: at 150 mA 
+[    0.424864] as3722-ldo5: supplied by +1V8_VDDIO
+[    0.425321] +VDDIO_SDMMC3: 1800 mV at 150 mA 
+[    0.425390] +VDDIO_SDMMC3: supplied by +3V3_RUN
+[    0.425710] as3722-ldo7: at 150 mA 
+[    0.425780] as3722-ldo7: supplied by +1V8_VDDIO
+[    0.426103] as3722-ldo9: at 150 mA 
+[    0.426165] as3722-ldo9: supplied by +5V_SYS
+[    0.426650] as3722-ldo10: at 150 mA 
+[    0.426710] as3722-ldo10: supplied by +5V_SYS
+[    0.427189] +1V8_RUN_VPP_FUSE: 1800 mV at 150 mA 
+[    0.427252] +1V8_RUN_VPP_FUSE: supplied by +3V3_RUN
+[    0.428040] gpio wake35 for gpio=70
+[    0.428718] Linux video capture interface: v2.00
+[    0.429841] Advanced Linux Sound Architecture Driver Initialized.
+[    0.433588] as3722-adc-extcon as3722-adc-extcon.2: USB-Host is disconnected
+[    0.436664] platform power_detect.8: Driver tegra-power-detect requests probe deferral
+[    0.436942] Switching to clocksource arch_sys_counter
+[    0.458753] nvmap_heap_init: nvmap_heap_init: created heap block cache
+[    0.458937] nvmap_page_pool_init: Total MB RAM: 1991
+[    0.458950] nvmap_page_pool_init: nvmap page pool size: 63734 pages (248 MB)
+[    0.459107] nvmap_background_zero_thread: PP zeroing thread starting.
+[    0.459275]  iram: dma coherent mem declare 0x40001000,258048
+[    0.460128] misc nvmap: created heap iram base 0x40001000 size (252KiB)
+[    0.460271] nvmap:inner cache maint threshold=2097152
+[    0.470015] Wake39 for irq=52
+[    0.470103] tegra-otg tegra-otg: otg transceiver registered
+[    0.470456] thermal thermal_zone0: Registering thermal zone thermal_zone0 for type com-thermal
+[    0.470724] thermal thermal_zone1: Registering thermal zone thermal_zone1 for type cpu-thermal
+[    0.470900] NET: Registered protocol family 2
+[    0.471783] TCP established hash table entries: 8192 (order: 4, 65536 bytes)
+[    0.471976] TCP bind hash table entries: 8192 (order: 4, 65536 bytes)
+[    0.472175] TCP: Hash tables configured (established 8192 bind 8192)
+[    0.472227] TCP: reno registered
+[    0.472244] UDP hash table entries: 512 (order: 2, 16384 bytes)
+[    0.472289] UDP-Lite hash table entries: 512 (order: 2, 16384 bytes)
+[    0.472583] NET: Registered protocol family 1
+[    0.472984] RPC: Registered named UNIX socket transport module.
+[    0.473016] RPC: Registered udp transport module.
+[    0.473027] RPC: Registered tcp transport module.
+[    0.473036] RPC: Registered tcp NFSv4.1 backchannel transport module.
+[    0.473300] tegra-fuse tegra-fuse: Fuse driver initialized succesfully
+[    0.478818] host1x host1x: initialized
+[    0.479409] hw perfevents: enabled with ARMv7 Cortex-A15 PMU driver, 7 counters available
+[    0.480156] tegra_throttle : init passed
+[    0.480240] Tegra cpuquiet initialized: disabled
+[    0.480376] cpu-tegra: init EDP limit: 2065 MHz
+[    0.481327] thermal thermal_zone2: Registering thermal zone thermal_zone2 for type CPU-therm
+[    0.481692] thermal thermal_zone3: Registering thermal zone thermal_zone3 for type GPU-therm
+[    0.481898] thermal thermal_zone4: Registering thermal zone thermal_zone4 for type MEM-therm
+[    0.482143] thermal thermal_zone5: Registering thermal zone thermal_zone5 for type PLL-therm
+[    0.483818] bounce pool size: 64 pages
+[    0.485280] Installing knfsd (copyright (C) 1996 okir@monad.swb.de).
+[    0.485557] NTFS driver 2.1.30 [Flags: R/O].
+[    0.485706] fuse init (API version 7.22)
+[    0.485938] msgmni has been set to 1449
+[    0.487638] io scheduler noop registered (default)
+[    0.488146] PCIE: Failed to enable regulators
+[    0.488190] PCIE: Failed to power on: -517
+[    0.488201] PCIE: get resources failed
+[    0.488226] platform pcie-controller.1: Driver tegra-pcie requests probe deferral
+[    0.488728] regulator_get() failed for (backlight.9,power), -19
+[    0.488837] sysedp_create_consumer: unable to create backlight.9, no consumer_data for backlight.9 found
+[    0.490312] tsec tsec: initialized
+[    0.492379] isp isp.0: initialized
+[    0.493864] isp isp.1: initialized
+[    0.495930] falcon vic03.0: initialized
+[    0.497655] falcon msenc: initialized
+[    0.498712] tegradc tegradc.0: No ddc device node in /host1x/dsi
+[    0.498730] of_dc_parse_platform_data: could not find SD settings node
+[    0.499140] tegradc tegradc.0: DSI: HS clock rate is 209500
+[    0.564507] tegradc tegradc.0: nominal-pclk:69748000 parent:69500000 div:1.0 pclk:69500000 63470680~76025320
+[    0.654172] tegradc tegradc.0: DSI pad calibration done
+[    1.126876] tegradc tegradc.0: probed
+[    1.127557] tegradc tegradc.0: nominal-pclk:69666000 parent:208500000 div:3.0 pclk:69500000 63396060~75935940
+[    1.137125] Console: switching to colour frame buffer device 90x80
+[    1.149267] tegradc tegradc.0: fb registered
+[    1.153012] tegra-apbdma tegra-apbdma: Tegra20 APB DMA driver register 32 channels
+[    1.153755] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+[    1.155377] serial8250.3: ttyS0 at MMIO 0x70006300 (irq = 122) is a Tegra
+[    2.921433] console [ttyS0] enabled
+[    2.925802] serial-tegra.0: ttyTHS0 at MMIO 0x70006000 (irq = 68) is a SERIAL_TEGRA
+[    2.933742] serial-tegra.1: ttyTHS1 at MMIO 0x70006040 (irq = 69) is a SERIAL_TEGRA
+[    2.941709] serial-tegra.2: ttyTHS2 at MMIO 0x70006200 (irq = 78) is a SERIAL_TEGRA
+[    2.954625] loop: module loaded
+[    2.958343] tegra_profiler: Branch: Dev
+[    2.962227] tegra_profiler: Version: 1.103
+[    2.966338] tegra_profiler: Samples version: 34
+[    2.970876] tegra_profiler: IO version: 18
+[    2.974984] armv7_pmu: arch: Cortex A15, type: 4, ver: 0
+[    2.980452] tegra_profiler: auth: init
+[    2.984576] GPS: mt3332_gps_mod_init: platform_driver_register ret = 0
+[    2.993980] tun: Universal TUN/TAP device driver, 1.6
+[    2.999048] tun: (C) 1999-2004 Max Krasnyansky <maxk@qualcomm.com>
+[    3.005516] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+[    3.012204] tegra USB phy - inst[0] platform info:
+[    3.017013] port_otg: yes
+[    3.019649] has_hostpc: yes
+[    3.022452] phy_interface: USB_PHY_INTF_UTMI
+[    3.026760] op_mode: TEGRA_USB_OPMODE_HOST
+[    3.030867] qc2_voltage: 0
+[    3.033586] vbus_gpio: -1
+[    3.036217] hot_plug: enabled
+[    3.039194] remote_wakeup: enabled
+[    3.042658] tegra-ehci tegra-ehci.0: failed to open USB phy (-517)
+[    3.048888] platform tegra-ehci.0: Driver tegra-ehci requests probe deferral
+[    3.056019] tegra-ehci tegra-ehci.1: Failed to get id-det-type, assume default
+[    3.063311] tegra USB phy - inst[1] platform info:
+[    3.068137] port_otg: no
+[    3.070684] has_hostpc: yes
+[    3.073488] phy_interface: USB_PHY_INTF_UTMI
+[    3.077766] op_mode: TEGRA_USB_OPMODE_HOST
+[    3.081869] qc2_voltage: 0
+[    3.084586] vbus_gpio: -1
+[    3.087216] hot_plug: disabled
+[    3.090303] remote_wakeup: enabled
+[    3.093752] tegra-ehci tegra-ehci.1: failed to open USB phy (-517)
+[    3.099954] platform tegra-ehci.1: Driver tegra-ehci requests probe deferral
+[    3.107059] tegra-ehci tegra-ehci.2: Failed to get id-det-type, assume default
+[    3.114372] tegra USB phy - inst[2] platform info:
+[    3.119172] port_otg: no
+[    3.121716] has_hostpc: yes
+[    3.124520] phy_interface: USB_PHY_INTF_UTMI
+[    3.128797] op_mode: TEGRA_USB_OPMODE_HOST
+[    3.132901] qc2_voltage: 0
+[    3.135643] vbus_gpio: -1
+[    3.138275] hot_plug: disabled
+[    3.141362] remote_wakeup: enabled
+[    3.144808] tegra-ehci tegra-ehci.2: failed to open USB phy (-517)
+[    3.151027] platform tegra-ehci.2: Driver tegra-ehci requests probe deferral
+[    3.158208] ehci-pci: EHCI PCI platform driver
+[    3.163057] usbcore: registered new interface driver usb-storage
+[    3.169166] usbcore: registered new interface driver usbserial
+[    3.175039] usbcore: registered new interface driver option
+[    3.180676] usbserial: USB Serial support registered for GSM modem (1-port)
+[    3.187676] usbcore: registered new interface driver pl2303
+[    3.193290] usbserial: USB Serial support registered for pl2303
+[    3.199410] tegra USB phy - inst[0] platform info:
+[    3.204238] port_otg: yes
+[    3.206871] has_hostpc: yes
+[    3.209675] phy_interface: USB_PHY_INTF_UTMI
+[    3.213953] op_mode: TEGRA_USB_OPMODE_DEVICE
+[    3.218230] qc2_voltage: 0
+[    3.220946] vbus_pmu_irq: 0
+[    3.223750] vbus_gpio: -1
+[    3.226404] charging: disabled
+[    3.229470] remote_wakeup: disabled
+[    3.233017] tegra-udc tegra-udc.0: failed to open USB phy
+[    3.238438] platform tegra-udc.0: Driver tegra-udc requests probe deferral
+[    3.246849] input: as3722-input as /devices/platform/tegra12-i2c.4/i2c-4/4-0040/as3722-input.6/input/input0
+[    3.259298] as3722-rtc as3722-rtc.1: rtc core: registered as3722 as rtc0
+[    3.266046] as3722-rtc as3722-rtc.1: RTC interrupt 449
+[    3.273263] i2c /dev entries driver
+[    3.280460] nvavp nvavp: allocated IOVA at 8ff00000 for AVP os
+[    3.287154] usbcore: registered new interface driver uvcvideo
+[    3.292911] USB Video Class driver (1.1.1)
+[    3.297794] zram: Created 1 device(s) ...
+[    3.303459] gpio wake35 for gpio=70
+[    3.313491] tegra-i2c tegra12-i2c.1: no acknowledge from address 0x70
+[    3.320053] tmp103 1-0070: error writing config register
+[    3.325443] tmp103: probe of 1-0070 failed with error -121
+[    3.331629] tegra-wdt 60005000.timer: initialized (heartbeat = 120 sec, nowayout = 1)
+[    3.339860] sdhci: Secure Digital Host Controller Interface driver
+[    3.346085] sdhci: Copyright(c) Pierre Ossman
+[    3.350486] sdhci-pltfm: SDHCI platform and OF driver helper
+[    3.356645] sdhci-tegra sdhci-tegra.3: Speedo value 0
+[    3.361716] sdhci-tegra sdhci-tegra.3: Tuning constraints: nom_mv 1150, boot_mv 1150, min_or_mv 1150
+[    3.370943] regulator_get() failed for (sdhci-tegra.3,vqmmc), -19
+[    3.377047] mmc0: no vqmmc regulator found
+[    3.381159] regulator_get() failed for (sdhci-tegra.3,vmmc), -19
+[    3.387171] mmc0: no vmmc regulator found
+[    3.391216] mmc0: Invalid maximum block size, assuming 512 bytes
+[    3.397254] sysedp_create_consumer: unable to create sdhci-tegra.3, no consumer_data for sdhci-tegra.3 found
+[    3.431055] mmc0: SDHCI controller on sdhci-tegra.3 [sdhci-tegra.3] using ADMA
+[    3.439128] sdhci-tegra sdhci-tegra.2: Speedo value 0
+[    3.444200] sdhci-tegra sdhci-tegra.2: Tuning constraints: nom_mv 1150, boot_mv 1150, min_or_mv 1150
+[    3.453529] regulator_get() failed for (sdhci-tegra.2,vqmmc), -19
+[    3.459655] mmc1: no vqmmc regulator found
+[    3.463901] mmc1: Invalid maximum block size, assuming 512 bytes
+[    3.470028] sysedp_create_consumer: unable to create sdhci-tegra.2, no consumer_data for sdhci-tegra.2 found
+[    3.505042] mmc1: SDHCI controller on sdhci-tegra.2 [sdhci-tegra.2] using ADMA
+[    3.513959] tegra-se tegra12-se: crypto_register_sha alg failed index[5]
+[    3.520751] ------------[ cut here ]------------
+[    3.525378] WARNING: at kernel/irq/manage.c:1244 __free_irq+0xb8/0x21c()
+[    3.532069] Trying to free already-free IRQ 90
+[    3.536505] Modules linked in:
+[    3.539571] CPU: 1 PID: 1 Comm: swapper/0 Tainted: G        W    3.10.104 #1
+[    3.546629] [<c0016e2c>] (unwind_backtrace+0x0/0x134) from [<c00130a4>] (show_stack+0x18/0x1c)
+[    3.549528] mmc0: BKOPS_EN bit is not set
+[    3.555182] sdhci-tegra sdhci-tegra.3: Found T2T coeffs data
+[    3.555190] sdhci-tegra sdhci-tegra.3: 200MHz tap hole coeffs found
+[    3.571138] [<c00130a4>] (show_stack+0x18/0x1c) from [<c005f6d0>] (warn_slowpath_common+0x5c/0x74)
+[    3.580091] [<c005f6d0>] (warn_slowpath_common+0x5c/0x74) from [<c005f720>] (warn_slowpath_fmt+0x38/0x48)
+[    3.589652] [<c005f720>] (warn_slowpath_fmt+0x38/0x48) from [<c00d7918>] (__free_irq+0xb8/0x21c)
+[    3.598434] [<c00d7918>] (__free_irq+0xb8/0x21c) from [<c00d7b10>] (free_irq+0x44/0x78)
+[    3.606438] [<c00d7b10>] (free_irq+0x44/0x78) from [<c05b8370>] (tegra_se_probe+0x200/0x9bc)
+[    3.614873] [<c05b8370>] (tegra_se_probe+0x200/0x9bc) from [<c0432448>] (driver_probe_device+0x144/0x3a8)
+[    3.624430] [<c0432448>] (driver_probe_device+0x144/0x3a8) from [<c043278c>] (__driver_attach+0x94/0x98)
+[    3.633904] [<c043278c>] (__driver_attach+0x94/0x98) from [<c0430458>] (bus_for_each_dev+0x74/0xa8)
+[    3.642945] [<c0430458>] (bus_for_each_dev+0x74/0xa8) from [<c04319c4>] (bus_add_driver+0x1dc/0x280)
+[    3.652071] [<c04319c4>] (bus_add_driver+0x1dc/0x280) from [<c04330c4>] (driver_register+0x80/0x148)
+[    3.661194] [<c04330c4>] (driver_register+0x80/0x148) from [<c0008798>] (do_one_initcall+0xdc/0x198)
+[    3.670321] [<c0008798>] (do_one_initcall+0xdc/0x198) from [<c0acbc58>] (kernel_init_freeable+0x194/0x234)
+[    3.679970] [<c0acbc58>] (kernel_init_freeable+0x194/0x234) from [<c07bf3bc>] (kernel_init+0x14/0x168)
+[    3.689270] [<c07bf3bc>] (kernel_init+0x14/0x168) from [<c000f1a0>] (ret_from_fork+0x14/0x20)
+[    3.697782] ---[ end trace 1b75b31a2719ed1d ]---
+[    3.702443] tegra-se: probe of tegra12-se failed with error -22
+[    3.710612] usbcore: registered new interface driver usbhid
+[    3.716197] usbhid: USB HID core driver
+[    3.720388] tegra-hier-ictlr 60004800.hier-ictlr: probed
+[    3.727355] usbcore: registered new interface driver snd-usb-audio
+[    3.734231] tegra_offload_platform probe successfull.
+[    3.742448] oprofile: using timer interrupt.
+[    4.102957] GACT probability NOT on
+[    4.103118] **********Auto tuning windows*************
+[    4.103122] WIN_ATTR legend: 0-BOUN_ST, 1-BOUN_END, 2-HOLE
+[    4.103128] win[0]: 0(0) - 66(1)
+[    4.103133] win[1]: 72(0) - 147(1)
+[    4.103137] win[2]: 153(0) - 229(1)
+[    4.103141] win[3]: 235(0) - 255(1)
+[    4.103143] ***************************************
+[    4.103153] ********tuning windows after inserting holes*****
+[    4.103156] WIN_ATTR legend: 0-BOUN_ST, 1-BOUN_END, 2-HOLE
+[    4.103161] win[0]:-9(0) - 42(2)
+[    4.103165] win[1]:44(2) - 66(1)
+[    4.103169] win[2]:72(0) - 123(2)
+[    4.103173] win[3]:125(2) - 147(1)
+[    4.103177] win[4]:153(0) - 204(2)
+[    4.103180] win[5]:206(2) - 229(1)
+[    4.103184] win[6]:235(0) - 255(1)
+[    4.103187] ***********************************************
+[    4.103192] **********Tuning values*********
+[    4.103194] **estimated values**
+[    4.103200] T2T_Vmax 118, T2T_Vmin 188, 1'st_hole_Vmax 4294951, UI_Vmax 42
+[    4.103203] **Calculated values**
+[    4.103207] T2T_Vmax 61, 1'st_hole_Vmax 43, UI_Vmax 81
+[    4.103211] T2T_Vmin 61, 1'st_hole_Vmin 43, UI_Vmin 81
+[    4.103214] ***********************************
+[    4.103220] ***********final tuning windows**********
+[    4.103223] win[0]: 7 - 33
+[    4.103227] win[1]: 54 - 50
+[    4.103230] win[2]: 88 - 109
+[    4.103233] win[3]: 140 - 131
+[    4.103236] win[4]: 169 - 184
+[    4.103240] win[5]: 227 - 213
+[    4.103243] win[6]: 251 - 239
+[    4.103246] ********************************
+[    4.103251] best tap win - (7-33), best tap value 20 prev_best_tap 0
+[    4.244026] Mirror/redirect action on
+[    4.247705] u32 classifier
+[    4.250420]     Actions configured
+[    4.253831] Netfilter messages via NETLINK v0.30.
+[    4.258602] nf_conntrack version 0.5.0 (16384 buckets, 65536 max)
+[    4.655152] **********Auto tuning windows*************
+[    4.655379] NF_TPROXY: Transparent proxy support initialized, version 4.1.0
+[    4.655382] NF_TPROXY: Copyright (c) 2006-2007 BalaBit IT Ltd.
+[    4.673198] WIN_ATTR legend: 0-BOUN_ST, 1-BOUN_END, 2-HOLE
+[    4.673323] xt_time: kernel timezone is -0000
+[    4.673639] ip_tables: (C) 2000-2006 Netfilter Core Team
+[    4.673806] arp_tables: (C) 2002 David S. Miller
+[    4.673850] TCP: cubic registered
+[    4.696356] win[0]: 0(0) - 66(1)
+[    4.699634] NET: Registered protocol family 10
+[    4.699730] win[1]: 72(0) - 147(1)
+[    4.699736] win[2]: 153(0) - 228(1)
+[    4.699739] win[3]: 234(0) - 255(1)
+[    4.699742] ***************************************
+[    4.699751] ********tuning windows after inserting holes*****
+[    4.699760] WIN_ATTR legend: 0-BOUN_ST, 1-BOUN_END, 2-HOLE
+[    4.699765] win[0]:-9(0) - 42(2)
+[    4.699769] win[1]:44(2) - 66(1)
+[    4.699773] win[2]:72(0) - 123(2)
+[    4.699777] win[3]:125(2) - 147(1)
+[    4.699781] win[4]:153(0) - 204(2)
+[    4.699784] win[5]:206(2) - 228(1)
+[    4.699787] win[6]:234(0) - 255(1)
+[    4.699790] ***********************************************
+[    4.699794] **********Tuning values*********
+[    4.699797] **estimated values**
+[    4.699802] T2T_Vmax 118, T2T_Vmin 188, 1'st_hole_Vmax 4294951, UI_Vmax 42
+[    4.699804] **Calculated values**
+[    4.699899] T2T_Vmax 61, 1'st_hole_Vmax 43, UI_Vmax 81
+[    4.699903] T2T_Vmin 61, 1'st_hole_Vmin 43, UI_Vmin 81
+[    4.699906] ***********************************
+[    4.699911] ***********final tuning windows**********
+[    4.699915] win[0]: 7 - 33
+[    4.699926] win[1]: 54 - 50
+[    4.699929] win[2]: 88 - 109
+[    4.699932] win[3]: 140 - 131
+[    4.699936] win[4]: 169 - 184
+[    4.699939] win[5]: 227 - 212
+[    4.699942] win[6]: 250 - 239
+[    4.699945] ********************************
+[    4.699950] best tap win - (7-33), best tap value 20 prev_best_tap 20
+[    4.699961] sdhci-tegra sdhci-tegra.3: sdhci_tegra_verify_best_tap: tuning freq 200000000hz, best tap 20
+[    4.703777] mmc0: new HS200 MMC card at address 0001
+[    4.704043] mmcblk mmc0:0001: Card claimed for testing.
+[    4.704249] mmcblk0: mmc0:0001 HAG4a2 14.6 GiB 
+[    4.704404] mmcblk0boot0: mmc0:0001 HAG4a2 partition 1 4.00 MiB
+[    4.704555] mmcblk0boot1: mmc0:0001 HAG4a2 partition 2 4.00 MiB
+[    4.708785]  mmcblk0: p1 p2 p3 p4 p5 p6
+[    4.711170]  mmcblk0boot1: unknown partition table
+[    4.712111]  mmcblk0boot0: unknown partition table
+[    4.720794] mmc1: card claims to support voltages below the defined range. These will be ignored.
+[    4.734514] mmc1: queuing unknown CIS tuple 0x91 (3 bytes)
+[    4.736546] mmc1: new high speed SDIO card at address 0001
+[    4.897594] mip6: Mobile IPv6
+[    4.900615] ip6_tables: (C) 2000-2006 Netfilter Core Team
+[    4.906169] sit: IPv6 over IPv4 tunneling driver
+[    4.911685] NET: Registered protocol family 17
+[    4.916180] NET: Registered protocol family 15
+[    4.920715] NET: Registered protocol family 35
+[    4.925277] NET: Registered protocol family 37
+[    4.929741] NET: Registered protocol family 41
+[    4.934839] VFP support v0.3: implementor 41 architecture 4 part 30 variant f rev 0
+[    4.966548] Registering SWP/SWPB emulation handler
+[    4.971365] last reset is due to power on reset
+[    4.971365] 
+[    4.978241] tegra dvfs: tegra sysfs cap interface is initialized
+[    4.984363] tegra dvfs: tegra sysfs gpu & emc interface is initialized
+[    4.991755] tegra_actmon.emc: Completed initialization (0)
+[    4.997491] tegra_actmon.avp: Completed initialization (0)
+[    5.003142] tegra_mon.cpu_emc: Completed initialization (0)
+[    5.011577] +1V8_RUN_VPP_FUSE: disabling
+[    5.015721] as3722-ldo10: disabling
+[    5.019406] as3722-ldo9: disabling
+[    5.023014] as3722-ldo7: disabling
+[    5.026684] as3722-ldo5: disabling
+[    5.030303] AVDD_LVDS_PLL: disabling
+[    5.034074] +1V8_RUN_CAM: disabling
+[    5.037819] +VDD_GPU_AP: disabling
+[    5.041410] +1V05_RUN: disabling
+[    5.044657] +3V3_AVDD_HDMI_AP_GATED: disabling
+[    5.049176] AMP_EN: disabling
+[    5.052187] USB1_VCC: disabling
+[    5.055365] USB_CLIENT_VBUS: disabling
+[    5.059126] +3V3_mPCIe: disabling
+[    5.062513] +1V5_mPCIe: disabling
+[    5.065841] HDMI_VCC: disabling
+[    5.069005] regulator-dummy: disabling
+[    5.073219] +1V8_EXT: 1800 mV 
+[    5.076337] +1V8_EXT: supplied by +1V8_VDDIO
+[    5.081359] +3V3_LP0: 3300 mV 
+[    5.084558] +3V3_LP0: supplied by +3V3_SYS
+[    5.088980] +1V05_RUN_AVDD_HDMI_PLL_AP_GATED: 1050 mV 
+[    5.094193] +1V05_RUN_AVDD_HDMI_PLL_AP_GATED: supplied by +1V05_RUN
+[    5.102765] tegra: started io power detection dynamic control
+[    5.108598] tegra: NO_IO_POWER setting 0x0
+[    5.314105] PCIE: port 0: link down, retrying
+[    5.518494] PCIE: port 0: link down, retrying
+[    5.722951] PCIE: port 0: link down, retrying
+[    5.727319] PCIE: port 0: link down, ignoring
+[    5.731723] PCIE: no ports detected
+[    5.735899] tegra USB phy - inst[0] platform info:
+[    5.740763] port_otg: yes
+[    5.743400] has_hostpc: yes
+[    5.746205] phy_interface: USB_PHY_INTF_UTMI
+[    5.750483] op_mode: TEGRA_USB_OPMODE_HOST
+[    5.754602] qc2_voltage: 0
+[    5.757349] vbus_gpio: -1
+[    5.759983] hot_plug: enabled
+[    5.762961] remote_wakeup: enabled
+[    6.768393] tegra USB phy - inst[1] platform info:
+[    6.773217] port_otg: no
+[    6.775768] has_hostpc: yes
+[    6.778603] phy_interface: USB_PHY_INTF_UTMI
+[    6.782885] op_mode: TEGRA_USB_OPMODE_HOST
+[    6.787008] qc2_voltage: 0
+[    6.789728] vbus_gpio: -1
+[    6.792359] hot_plug: disabled
+[    6.795483] remote_wakeup: enabled
+[    6.801486] tegra-ehci tegra-ehci.1: Tegra EHCI Host Controller
+[    6.807456] tegra-ehci tegra-ehci.1: new USB bus registered, assigned bus number 1
+[    6.815178] Wake40 for irq=53
+[    6.818144] Wake42 for irq=53
+[    6.821186] tegra-ehci tegra-ehci.1: irq 53, io mem 0x7d004000
+[    6.833034] tegra-ehci tegra-ehci.1: USB 2.0 started, EHCI 1.10
+[    6.839074] usb usb1: New USB device found, idVendor=1d6b, idProduct=0002
+[    6.845925] usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[    6.853159] usb usb1: Product: Tegra EHCI Host Controller
+[    6.858647] usb usb1: Manufacturer: Linux 3.10.104 ehci_hcd
+[    6.864236] usb usb1: SerialNumber: tegra-ehci.1
+[    6.869550] hub 1-0:1.0: USB hub found
+[    6.873335] hub 1-0:1.0: 1 port detected
+[    6.877844] tegra USB phy - inst[2] platform info:
+[    6.882655] port_otg: no
+[    6.885201] has_hostpc: yes
+[    6.888039] phy_interface: USB_PHY_INTF_UTMI
+[    6.892320] op_mode: TEGRA_USB_OPMODE_HOST
+[    6.896426] qc2_voltage: 0
+[    6.899143] vbus_gpio: -1
+[    6.901785] hot_plug: disabled
+[    6.904851] remote_wakeup: enabled
+[    6.908549] regulator_get() failed for (tegra-ehci.2,usb_vbus), -19
+[    6.914897] usb_phy: failed to get regulator vdd_vbus_usb:-19,instance : 2
+[    6.923939] tegra-ehci tegra-ehci.2: Tegra EHCI Host Controller
+[    6.929917] tegra-ehci tegra-ehci.2: new USB bus registered, assigned bus number 2
+[    6.937619] Wake41 for irq=129
+[    6.940670] Wake43 for irq=129
+[    6.943760] tegra-ehci tegra-ehci.2: irq 129, io mem 0x7d008000
+[    6.955032] tegra-ehci tegra-ehci.2: USB 2.0 started, EHCI 1.10
+[    6.961047] usb usb2: New USB device found, idVendor=1d6b, idProduct=0002
+[    6.967848] usb usb2: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[    6.975117] usb usb2: Product: Tegra EHCI Host Controller
+[    6.980577] usb usb2: Manufacturer: Linux 3.10.104 ehci_hcd
+[    6.986237] usb usb2: SerialNumber: tegra-ehci.2
+[    6.991393] hub 2-0:1.0: USB hub found
+[    6.995204] hub 2-0:1.0: 1 port detected
+[    6.999650] tegra USB phy - inst[0] platform info:
+[    7.004459] port_otg: yes
+[    7.007092] has_hostpc: yes
+[    7.009897] phy_interface: USB_PHY_INTF_UTMI
+[    7.014178] op_mode: TEGRA_USB_OPMODE_DEVICE
+[    7.018501] qc2_voltage: 0
+[    7.021221] vbus_pmu_irq: 0
+[    7.024027] vbus_gpio: -1
+[    7.026658] charging: disabled
+[    7.029724] remote_wakeup: disabled
+[    7.035865] regulator_get() failed for (tegra-udc.0,usb_bat_chg), -19
+[    7.042366] tegra-udc tegra-udc.0: usb_bat_chg regulator not registered: USB charging will not be enabled
+[    7.052699] console [netcon0] enabled
+[    7.056444] netconsole: network logging started
+[    7.061395] as3722-rtc as3722-rtc.1: setting system clock to 2000-01-02 09:49:45 UTC (946806585)
+[    7.070643] Disabling clocks left on by bootloader:
+[    7.075515]    clk_out_3
+[    7.078071]    audio_2x
+[    7.080538]    audio
+[    7.082738]    audio4
+[    7.085025]    audio3
+[    7.087311]    audio2
+[    7.089609]    audio1
+[    7.091926]    audio0
+[    7.094292]    hdmi_audio
+[    7.096928]    entropy
+[    7.099356]    dsi2-fixed
+[    7.102002]    dsi1-fixed
+[    7.104653]    nor
+[    7.106683]    trace
+[    7.108887]    sdmmc4_ddr
+[    7.111564]    amx1
+[    7.113682]    amx
+[    7.115710]    adx1
+[    7.117825]    adx
+[    7.119852]    dam2
+[    7.121966]    dam1
+[    7.124095]    dam0
+[    7.126211]    spdif_in
+[    7.128676]    apbif
+[    7.130895]    cclk_lp
+[    7.133299]    pll_x_out0
+[    7.136006]    pll_u_12M
+[    7.138571]    pll_m_out1
+[    7.141330] tegra_dvfs: vdd_cpu connected to regulator
+[    7.146522] tegra_dvfs: vdd_core connected to regulator
+[    7.152314] tegra_dvfs: vdd_gpu connected to regulator
+[    7.158585] tegra_cl_dvfs tegra_cl_dvfs: DT data retrieved successfully
+[    7.165823] cpu_cold cooling device is registered
+[    7.170716] cpu_hot cooling device is registered
+[    7.170939] Tegra CPU DFLL is initialized with use_dfll = 1
+[    7.171029] CPU rate: 696 MHz
+[    7.346804] ALSA device list:
+[    7.349786]   No soundcards found.
+[    7.359420] EXT4-fs (mmcblk0p2): couldn't mount as ext3 due to feature incompatibilities
+[    7.367848] EXT4-fs (mmcblk0p2): couldn't mount as ext2 due to feature incompatibilities
+[    7.378742] EXT4-fs (mmcblk0p2): warning: maximal mount count reached, running e2fsck is recommended
+[    7.388912] EXT4-fs (mmcblk0p2): mounted filesystem with ordered data mode. Opts: (null)
+[    7.397040] VFS: Mounted root (ext4 filesystem) on device 179:2.
+[    7.404629] devtmpfs: mounted
+[    7.408430] Freeing unused kernel memory: 1384K (c0acb000 - c0c25000)
+[    7.475302] EXT4-fs (mmcblk0p4): mounted filesystem with ordered data mode. Opts: (null)
+[    7.490081] EXT4-fs (mmcblk0p5): warning: maximal mount count reached, running e2fsck is recommended
+[    7.500391] EXT4-fs (mmcblk0p5): recovery complete
+[    7.506322] EXT4-fs (mmcblk0p5): mounted filesystem with ordered data mode. Opts: (null)
+[    7.529545] EXT4-fs (mmcblk0p6): warning: maximal mount count reached, running e2fsck is recommended
+[    7.540137] EXT4-fs (mmcblk0p6): recovery complete
+[    7.544948] EXT4-fs (mmcblk0p6): mounted filesystem with ordered data mode. Opts: (null)
+
+can't run '/var/etc/first_boot_resize': No such file or directory
+/etc/ld.so.conf.d:
+/usr/local/lib:
+	libJiboDeepId.so -> libJiboDeepId.so
+	libJiboUtil.so -> libJiboUtil.so
+	libJiboV4L2Device.so -> libJiboV4L2Device.so
+	libJiboSystemManager.so -> libJiboSystemManager.so
+	libgoogleapis.so -> libgoogleapis.so
+	libJiboAudioService.so -> libJiboAudioService.so
+	libJiboTTSService.so -> libJiboTTSService.so
+	libJiboResnetFaceId.so -> libJiboResnetFaceId.so
+	libJiboBodyService.so -> libJiboBodyService.so
+	libJiboSystemMonitoringService.so -> libJiboSystemMonitoringService.so
+	libJiboPerceptionFramework.so -> libJiboPerceptionFramework.so
+	libJiboEPnP.so -> libJiboEPnP.so
+	libJiboCamCal.so -> libJiboCamCal.so
+	libJiboCUDADevice.so -> libJiboCUDADevice.so
+	libJiboServerService.so -> libJiboServerService.so
+	libJiboCaptureTools.so -> libJiboCaptureTools.so
+	libJiboCaptureDevice.so -> libJiboCaptureDevice.so
+	libJiboServiceFramework.so -> libJiboServiceFramework.so
+	libmmif.so -> libmmif.so
+	libmmfx.so -> libmmfx.so
+	libJiboIdentityService.so -> libJiboIdentityService.so
+	libJiboMediaService.so -> libJiboMediaService.so
+	libJiboLPSService.so -> libJiboLPSService.so
+/lib:
+	libgcc_s.so.1 -> libgcc_s.so.1
+	libpam.so.0 -> libpam.so.0.83.1
+	libuuid.so.1 -> libuuid.so.1.3.0
+	libresolv.so.2 -> libresolv-2.21.so
+	libmount.so.1 -> libmount.so.1.1.0
+	libpthread.so.0 -> libpthread-2.21.so
+	libnss_files.so.2 -> libnss_files-2.21.so
+	libblkid.so.1 -> libblkid.so.1.1.0
+	libm.so.6 -> libm-2.21.so
+	libpamc.so.0 -> libpamc.so.0.82.1
+	libfdisk.so.1 -> libfdisk.so.1.1.0
+	libdl.so.2 -> libdl-2.21.so
+	libatomic.so.1 -> libatomic.so.1.1.0
+	libsmartcols.so.1 -> libsmartcols.so.1.1.0
+	ld-linux-armhf.so.3 -> ld-2.21.so
+	libc.so.6 -> libc-2.21.so
+	libpam_misc.so.0 -> libpam_misc.so.0.82.0
+	libthread_db.so.1 -> libthread_db-1.0.so
+	libudev.so.1 -> libudev.so.1.6.3
+	libutil.so.1 -> libutil-2.21.so
+	libnss_dns.so.2 -> libnss_dns-2.21.so
+	librt.so.1 -> librt-2.21.so
+	libnsl.so.1 -> libnsl-2.21.so
+	libcrypt.so.1 -> libcrypt-2.21.so
+/usr/lib:
+/sbin/ldconfig: /usr/lib/libstdc++.so.6.0.20-gdb.py is not an ELF file - it has the wrong magic bytes at the start.
+
+	libaws-cpp-sdk-polly.so -> libaws-cpp-sdk-polly.so
+	libORBitCosNaming-2.so.0 -> libORBitCosNaming-2.so.0.1.0
+	libPocoNet.so.48 -> libPocoNet.so.48
+	libgrpc_unsecure.so.3 -> libgrpc_unsecure.so.3.0.0-dev
+	libgconf-2.so.4 -> libgconf-2.so.4.1.5
+	libopencv_ml.so.3.1 -> libopencv_ml.so.3.1.0
+	libdlib.so.19.3.0 -> libdlib.so.19.3.0
+	libfreetype.so.6 -> libfreetype.so.6.12.1
+	libopencv_shape.so.3.1 -> libopencv_shape.so.3.1.0
+	libnvjpeg.so -> libnvjpeg.so
+	libgstnvegl-1.0.so.0 -> libgstnvegl-1.0.so.0
+	libexpat.so.1 -> libexpat.so.1.6.0
+	libnvidia-eglcore.so.21.5 -> libnvidia-eglcore.so.21.5
+	libnvrm_graphics.so -> libnvrm_graphics.so
+	libnvmm.so -> libnvmm.so
+	libPocoFoundation.so.48 -> libPocoFoundation.so.48
+	libv8_libplatform.so -> libv8_libplatform.so
+	libnvmmlite.so -> libnvmmlite.so
+	libnvodm_imager.so -> libnvodm_imager.so
+	libdvbv5.so.0 -> libdvbv5.so.0.0.0
+	libinotifytools.so.0 -> libinotifytools.so.0.4.1
+	libnvdc.so -> libnvdc.so
+	libnvtestio.so -> libnvtestio.so
+	libusb-1.0.so.0 -> libusb-1.0.so.0.1.0
+	libnvmm_utils.so -> libnvmm_utils.so
+	libPocoMongoDB.so.48 -> libPocoMongoDB.so.48
+	libgstnet-0.10.so.0 -> libgstnet-0.10.so.0.30.0
+	libplc4.so -> libplc4.so
+	libtheora.so.0 -> libtheora.so.0.3.10
+	libvo-aacenc.so.0 -> libvo-aacenc.so.0.0.4
+	libnvmm_parser.so -> libnvmm_parser.so
+	libcudnn.so.6.5 -> libcudnn.so.6.5.48
+	libasound.so.2 -> libasound.so.2.0.0
+	libtasn1.so.6 -> libtasn1.so.6.5.0
+	libz.so.1 -> libz.so.1.2.8
+	libvorbis.so.0 -> libvorbis.so.0.4.8
+	libgrpc++_reflection.so.3 -> libgrpc++_reflection.so.1.2.3
+	libjpeg.so.8 -> libjpeg.so.8.0.2
+	libepeg.so.0 -> libepeg.so.0.9.1
+	libtheoradec.so.1 -> libtheoradec.so.1.1.4
+	libxcb-damage.so.0 -> libxcb-damage.so.0.0.0
+	libgstrtsp-1.0.so.0 -> libgstrtsp-1.0.so.0.802.0
+	libdbus-1.so.3 -> libdbus-1.so.3.14.4
+	libtheoraenc.so.1 -> libtheoraenc.so.1.1.2
+	libsnappy.so.1 -> libsnappy.so.1.2.1
+	libopusurl.so.0 -> libopusurl.so.0.4.2
+	libICE.so.6 -> libICE.so.6.3.0
+	libsz.so.2 -> libsz.so.2.0.0
+	libnvmmlite_audio.so -> libnvmmlite_audio.so
+	libPocoXML.so.48 -> libPocoXML.so.48
+	libnvomxilclient.so -> libnvomxilclient.so
+	libnvmmlite_video.so -> libnvmmlite_video.so
+	libv8_snapshot.so -> libv8_snapshot.so
+	libxkbcommon-x11.so.0 -> libxkbcommon-x11.so.0.0.0
+	libparted.so.2 -> libparted.so.2.0.0
+	libnettle.so.6 -> libnettle.so.6.1
+	libdw.so.1 -> libdw-0.161.so
+	libturbojpeg.so.0 -> libturbojpeg.so.0.1.0
+	libnvomx.so -> libnvomx.so
+	libisc.so.106 -> libisc.so.106.0.0
+	libgobject-2.0.so.0 -> libgobject-2.0.so.0.4600.1
+	libglib-2.0.so.0 -> libglib-2.0.so.0.4600.1
+	libxcb-xfixes.so.0 -> libxcb-xfixes.so.0.0.0
+	libform.so.5 -> libform.so.5.9
+	libgio-2.0.so.0 -> libgio-2.0.so.0.4600.1
+	libgpg-error.so.0 -> libgpg-error.so.0.10.0
+	libcap.so.2 -> libcap.so.2.24
+	libgailutil.so.18 -> libgailutil.so.18.0.1
+	libnssckbi.so -> libnssckbi.so
+	libNE10.so.10 -> libNE10.so.10
+	libPocoPDF.so.48 -> libPocoPDF.so.48
+	libXss.so.1 -> libXss.so.1.0.0
+	libXrandr.so.2 -> libXrandr.so.2.2.0
+	libnvtvmr.so -> libnvtvmr.so
+	libbind9.so.90 -> libbind9.so.90.0.14
+	libxcb-xvmc.so.0 -> libxcb-xvmc.so.0.0.0
+	libxcb-xv.so.0 -> libxcb-xv.so.0.0.0
+	libdns.so.108 -> libdns.so.108.1.0
+	libmtdev.so.1 -> libmtdev.so.1.0.0
+	libhdf5.so.10 -> libhdf5.so.10.2.0
+	libIDL-2.so.0 -> libIDL-2.so.0.0.0
+	libX11-xcb.so.1 -> libX11-xcb.so.1.0.0
+	libxkbfile.so.1 -> libxkbfile.so.1.0.2
+	libnvsm.so -> libnvsm.so
+	libXinerama.so.1 -> libXinerama.so.1.0.0
+	libnl-idiag-3.so.200 -> libnl-idiag-3.so.200.22.0
+	libxcb-sync.so.1 -> libxcb-sync.so.1.0.0
+	libv4lconvert.so.0 -> libv4lconvert.so.0.0.0
+	libGL.so.1 -> libGL.so.1
+	libpcap.so.1 -> libpcap.so.1.7.4
+	libsmime3.so -> libsmime3.so
+	libXpm.so.4 -> libXpm.so.4.11.0
+	libv8_nosnapshot.so -> libv8_nosnapshot.so
+	libnvodm_query.so -> libnvodm_query.so
+	libgnutls.so.28 -> libgnutls.so.28.41.10
+	libnvapputil.so -> libnvapputil.so
+	libXau.so.6 -> libXau.so.6.0.0
+	libxcb-randr.so.0 -> libxcb-randr.so.0.1.0
+	libXft.so.2 -> libXft.so.2.3.2
+	libaws-cpp-sdk-s3.so -> libaws-cpp-sdk-s3.so
+	libgstbase-1.0.so.0 -> libgstbase-1.0.so.0.802.0
+	libv8_libbase.so -> libv8_libbase.so
+	libXv.so.1 -> libXv.so.1.0.0
+	libnvddk_2d_v2.so -> libnvddk_2d_v2.so
+	libxkbcommon.so.0 -> libxkbcommon.so.0.0.0
+	libnvwinsys.so -> libnvwinsys.so
+	libxcb-glx.so.0 -> libxcb-glx.so.0.0.0
+	libgstsdp-1.0.so.0 -> libgstsdp-1.0.so.0.802.0
+	libprocps.so.4 -> libprocps.so.4.0.0
+	libavahi-gobject.so.0 -> libavahi-gobject.so.0.0.4
+	libgrpc.so.3 -> libgrpc.so.3.0.0-dev
+	libhdf5_hl.so.10 -> libhdf5_hl.so.10.1.0
+	libvorbisfile.so.3 -> libvorbisfile.so.3.3.7
+	libgstcontroller-1.0.so.0 -> libgstcontroller-1.0.so.0.802.0
+	libuv.so -> libuv.so
+	libsqlite3.so.0 -> libsqlite3.so.0.8.6
+	libnvtestresults.so -> libnvtestresults.so
+	libgdk_pixbuf-2.0.so.0 -> libgdk_pixbuf-2.0.so.0.3200.1
+	libnvavp.so -> libnvavp.so
+	libxcb-xevie.so.0 -> libxcb-xevie.so.0.0.0
+	libgmodule-2.0.so.0 -> libgmodule-2.0.so.0.4600.1
+	libarchive.so.13 -> libarchive.so.13.1.2
+	libjsoncpp.so.1 -> libjsoncpp.so.1.6.5
+	libgstinsertbin-1.0.so.0 -> libgstinsertbin-1.0.so.0.801.0
+	libgrpc++_cronet.so.3 -> libgrpc++_cronet.so.1.2.3
+	libgstbadaudio-1.0.so.0 -> libgstbadaudio-1.0.so.0.801.0
+	libpanel.so.5 -> libpanel.so.5.9
+	libopencv_imgproc.so.3.1 -> libopencv_imgproc.so.3.1.0
+	libgstreamer-1.0.so.0 -> libgstreamer-1.0.so.0.802.0
+	libvigraimpex.so.11 -> libvigraimpex.so.11.1.11.0
+	libxshmfence.so.1 -> libxshmfence.so.1.0.0
+	libexif.so.12 -> libexif.so.12.3.3
+	libpixman-1.so.0 -> libpixman-1.so.0.32.8
+	libgstcodecparsers-1.0.so.0 -> libgstcodecparsers-1.0.so.0.801.0
+	libaws-cpp-sdk-core.so -> libaws-cpp-sdk-core.so
+	libgstapp-1.0.so.0 -> libgstapp-1.0.so.0.802.0
+	libgstadaptivedemux-1.0.so.0 -> libgstadaptivedemux-1.0.so.0.801.0
+	libXdmcp.so.6 -> libXdmcp.so.6.0.0
+	libdrm.so.2 -> libdrm.so.2.4.0
+	libboost_system.so.1.58.0 -> libboost_system.so.1.58.0
+	libmenu.so.5 -> libmenu.so.5.9
+	libpangoft2-1.0.so.0 -> libpangoft2-1.0.so.0.3800.1
+	libip4tc.so.0 -> libip4tc.so.0.1.0
+	libfreebl3.so -> libfreebl3.so
+	libpython2.7.so.1.0 -> libpython2.7.so.1.0
+	libssl3.so -> libssl3.so
+	libbspline.so -> libbspline.so
+	libpopt.so.0 -> libpopt.so.0.0.0
+	libnvparser.so -> libnvparser.so
+	libstdc++.so.6 -> libstdc++.so.6.0.20
+	libgstrtp-1.0.so.0 -> libgstrtp-1.0.so.0.802.0
+	libsensors.so.4 -> libsensors.so.4.3.2
+	libgdk-x11-2.0.so.0 -> libgdk-x11-2.0.so.0.2400.28
+	libnvtnr.so -> libnvtnr.so
+	libgtk-3.so.0 -> libgtk-3.so.0.1400.15
+	libxcb-res.so.0 -> libxcb-res.so.0.0.0
+	libPocoJSON.so.48 -> libPocoJSON.so.48
+	libnssutil3.so -> libnssutil3.so
+	libXmuu.so.1 -> libXmuu.so.1.0.0
+	libfftw3f.so.3 -> libfftw3f.so.3.4.4
+	libopencv_video.so.3.1 -> libopencv_video.so.3.1.0
+	libpng16.so.16 -> libpng16.so.16.19.0
+	libisccc.so.90 -> libisccc.so.90.0.7
+	libatk-1.0.so.0 -> libatk-1.0.so.0.21809.1
+	libgstmpegts-1.0.so.0 -> libgstmpegts-1.0.so.0.801.0
+	libmagic.so.1 -> libmagic.so.1.0.0
+	libnvmmlite_utils.so -> libnvmmlite_utils.so
+	libxcb-shape.so.0 -> libxcb-shape.so.0.0.0
+	libGLESv1_CM.so.1 -> libGLESv1_CM.so.1
+	libgdk-3.so.0 -> libgdk-3.so.0.1400.15
+	libgflags.so.2 -> libgflags.so.2.1.2
+	libxcb-xprint.so.0 -> libxcb-xprint.so.0.0.0
+	libglade-2.0.so.0 -> libglade-2.0.so.0.0.7
+	libbfd-2.25.51.so -> libbfd.so
+	libXmu.so.6 -> libXmu.so.6.2.0
+	libXext.so.6 -> libXext.so.6.4.0
+	libcairo.so.2 -> libcairo.so.2.11400.4
+	libexslt.so.0 -> libexslt.so.0.8.17
+	libgstaudio-1.0.so.0 -> libgstaudio-1.0.so.0.802.0
+	libGLEW.so.1.12 -> libGLEW.so.1.12.0
+	libcairo-gobject.so.2 -> libcairo-gobject.so.2.11400.4
+	libharfbuzz.so.0 -> libharfbuzz.so.0.10000.6
+	libplds4.so -> libplds4.so
+	libavahi-client.so.3 -> libavahi-client.so.3.2.9
+	libgstbasecamerabinsrc-1.0.so.0 -> libgstbasecamerabinsrc-1.0.so.0.801.0
+	libxcb-dri2.so.0 -> libxcb-dri2.so.0.0.0
+	libXtst.so.6 -> libXtst.so.6.1.0
+	libPocoNetSSL.so.48 -> libPocoNetSSL.so.48
+	libnvidia-glsi.so.21.5 -> libnvidia-glsi.so.21.5
+	libcom_err.so.2 -> libcom_err.so.2.1
+	liblxc.so.1 -> liblxc.so.1.1.4
+	libleveldb.so.1 -> libleveldb.so.1.18
+	libgrpc_cronet.so.3 -> libgrpc_cronet.so.3.0.0-dev
+	libgdk_pixbuf_xlib-2.0.so.0 -> libgdk_pixbuf_xlib-2.0.so.0.3200.1
+	libgmp.so.10 -> libgmp.so.10.2.0
+	libopcodes-2.25.51.so -> libopcodes.so
+	libpangocairo-1.0.so.0 -> libpangocairo-1.0.so.0.3800.1
+	libprotobuf.so.12 -> libprotobuf.so.12.0.0
+	libnvmmlite_image.so -> libnvmmlite_image.so
+	libcgroup.so.1 -> libcgroup.so.1.0.41
+	libncurses.so.5 -> libncurses.so.5.9
+	libext2fs.so.2 -> libext2fs.so.2.4
+	libprotoc.so.12 -> libprotoc.so.12.0.0
+	libtiff.so.5 -> libtiff.so.5.2.4
+	libestr.so.0 -> libestr.so.0.0.0
+	libevent_extra-2.0.so.5 -> libevent_extra.so
+	libgsttag-1.0.so.0 -> libgsttag-1.0.so.0.802.0
+	libgflags_nothreads.so.2 -> libgflags_nothreads.so.2.1.2
+	libiptc.so.0 -> libiptc.so.0.0.0
+	libXfixes.so.3 -> libXfixes.so.3.1.0
+	libxml2.so.2 -> libxml2.so.2.9.3
+	libXcursor.so.1 -> libXcursor.so.1.0.2
+	libisccfg.so.90 -> libisccfg.so.90.3.0
+	libsox.so.3 -> libsox.so.3.0.0
+	libaugeas.so.0 -> libaugeas.so.0.20.0
+	libEGL.so.1 -> libEGL.so.1
+	libgpr.so.3 -> libgpr.so.3.0.0-dev
+	liblwres.so.91 -> liblwres.so.91.0.3
+	libreg.so -> libreg.so
+	liblzma.so.5 -> liblzma.so.5.2.2
+	libgstvideo-1.0.so.0 -> libgstvideo-1.0.so.0.802.0
+	libnvmedia.so -> libnvmedia.so
+	libxcb-xtest.so.0 -> libxcb-xtest.so.0.0.0
+	libPocoCrypto.so.48 -> libPocoCrypto.so.48
+	libgstpbutils-1.0.so.0 -> libgstpbutils-1.0.so.0.802.0
+	libopencv_objdetect.so.3.1 -> libopencv_objdetect.so.3.1.0
+	libgthread-2.0.so.0 -> libgthread-2.0.so.0.4600.1
+	libnssdbm3.so -> libnssdbm3.so
+	libreadline.so.6 -> libreadline.so.6.3
+	libXaw.so.6 -> libXaw6.so.6.0.1
+	libnvddk_vic.so -> libnvddk_vic.so
+	libkmod.so.2 -> libkmod.so.2.2.10
+	libpango-1.0.so.0 -> libpango-1.0.so.0.3800.1
+	libnl-xfrm-3.so.200 -> libnl-xfrm-3.so.200.22.0
+	libgif.so.7 -> libgif.so.7.0.0
+	libv8_base.so -> libv8_base.so
+	libgstbase-0.10.so.0 -> libgstbase-0.10.so.0.30.0
+	libopencv_highgui.so.3.1 -> libopencv_highgui.so.3.1.0
+	libvorbisenc.so.2 -> libvorbisenc.so.2.0.11
+	libogg.so.0 -> libogg.so.0.8.2
+	libgtk-x11-2.0.so.0 -> libgtk-x11-2.0.so.0.2400.28
+	libtegrav4l2.so -> libtegrav4l2.so
+	libts-1.0.so.0 -> libts.so
+	libkeyutils.so.1 -> libkeyutils.so.1.5
+	libSM.so.6 -> libSM.so.6.0.1
+	libnl-3.so.200 -> libnl-3.so.200.22.0
+	libgstbadvideo-1.0.so.0 -> libgstbadvideo-1.0.so.0.801.0
+	libPocoUtil.so.48 -> libPocoUtil.so.48
+	libxcb-screensaver.so.0 -> libxcb-screensaver.so.0.0.0
+	libxcb.so.1 -> libxcb.so.1.1.0
+	libfontconfig.so.1 -> libfontconfig.so.1.8.0
+	libopencv_imgcodecs.so.3.1 -> libopencv_imgcodecs.so.3.1.0
+	libglx.so -> libglx.so
+	libnvrm.so -> libnvrm.so
+	libgstphotography-1.0.so.0 -> libgstphotography-1.0.so.0.801.0
+	libparted-fs-resize.so.0 -> libparted-fs-resize.so.0.0.0
+	libv4l2.so.0 -> libv4l2.so.0.0.0
+	libevent_core-2.0.so.5 -> libevent_core.so
+	libsoup-2.4.so.1 -> libsoup-2.4.so.1.7.0
+	libffi.so.6 -> libffi.so.6.0.4
+	libgstallocators-1.0.so.0 -> libgstallocators-1.0.so.0.802.0
+	libPocoZip.so.48 -> libPocoZip.so.48
+	libpcre.so.1 -> libpcre.so.1.2.6
+	libopencv_photo.so.3.1 -> libopencv_photo.so.3.1.0
+	libdbus-glib-1.so.2 -> libdbus-glib-1.so.2.3.2
+	libssl.so.1.0.0 -> libssl.so.1.0.0
+	libbz2.so.1.0 -> libbz2.so.1.0.6
+	liblogging-stdlog.so.0 -> liblogging-stdlog.so.0.0.0
+	libpcreposix.so.0 -> libpcreposix.so.0.0.3
+	libnvmm_camera_v3.so -> libnvmm_camera_v3.so
+	libgstgl-1.0.so.0 -> libgstgl-1.0.so.0.801.0
+	libkms.so.1 -> libkms.so.1.0.0
+	libgstreamer-0.10.so.0 -> libgstreamer-0.10.so.0.30.0
+	libdns_sd.so.1 -> libdns_sd.so.1.0.0
+	libpangoxft-1.0.so.0 -> libpangoxft-1.0.so.0.3800.1
+	libnvos.so -> libnvos.so
+	libXcomposite.so.1 -> libXcomposite.so.1.0.0
+	libboost_thread.so.1.58.0 -> libboost_thread.so.1.58.0
+	libgstdataprotocol-0.10.so.0 -> libgstdataprotocol-0.10.so.0.30.0
+	libxcb-record.so.0 -> libxcb-record.so.0.0.0
+	libnl-nf-3.so.200 -> libnl-nf-3.so.200.22.0
+	libGLESv2.so.2 -> libGLESv2.so.2
+	libfstscript.so.1 -> libfstscript.so.1.0.0
+	libXt.so.6 -> libXt.so.6.0.0
+	libgstcontroller-0.10.so.0 -> libgstcontroller-0.10.so.0.30.0
+	libgailutil-3.so.0 -> libgailutil-3.so.0.0.0
+	libGLU.so.1 -> libGLU.so.1.3.1
+	libnotify.so.4 -> libnotify.so.4.0.0
+	libcaffe.so.1.0.0 -> libcaffe.so
+	libxcb-render.so.0 -> libxcb-render.so.0.0.0
+	libevdev.so.2 -> libevdev.so.2.1.10
+	libsoftokn3.so -> libsoftokn3.so
+	libxslt.so.1 -> libxslt.so.1.1.28
+	libnvidia-glcore.so.21.5 -> libnvidia-glcore.so.21.5
+	libX11.so.6 -> libX11.so.6.3.0
+	libss.so.2 -> libss.so.2.0
+	libXdamage.so.1 -> libXdamage.so.1.1.0
+	libcurl.so.4 -> libcurl.so.4.4.0
+	libwpa_client.so -> libwpa_client.so
+	libip6tc.so.0 -> libip6tc.so.0.1.0
+	libgstfft-1.0.so.0 -> libgstfft-1.0.so.0.802.0
+	libdaemon.so.0 -> libdaemon.so.0.5.0
+	libe2p.so.2 -> libe2p.so.2.3
+	libglog.so.0 -> libglog.so.0.0.0
+	libfontenc.so.1 -> libfontenc.so.1.0.0
+	libxcb-dri3.so.0 -> libxcb-dri3.so.0.0.0
+	libfa.so.1 -> libfa.so.1.4.1
+	libxcb-xkb.so.1 -> libxcb-xkb.so.1.0.0
+	libPocoCppParser.so.48 -> libPocoCppParser.so.48
+	libXRes.so.1 -> libXRes.so.1.0.0
+	libhistory.so.6 -> libhistory.so.6.3
+	libopencv_features2d.so.3.1 -> libopencv_features2d.so.3.1.0
+	libv4l2rds.so.0 -> libv4l2rds.so.0.0.0
+	libxtables.so.10 -> libxtables.so.10.0.0
+	libNE10_test.so.10 -> libNE10_test.so.10
+	libnvidia-rmapi-tegra.so.21.5 -> libnvidia-rmapi-tegra.so.21.5
+	libcrypto.so.1.0.0 -> libcrypto.so.1.0.0
+	libXfont.so.1 -> libXfont.so.1.4.1
+	libprotobuf-lite.so.12 -> libprotobuf-lite.so.12.0.0
+	libevent-2.0.so.5 -> libevent.so
+	libXi.so.6 -> libXi.so.6.1.0
+	libgstnet-1.0.so.0 -> libgstnet-1.0.so.0.802.0
+	libopencv_flann.so.3.1 -> libopencv_flann.so.3.1.0
+	libcuda.so.1 -> libcuda.so.1.1
+	libavahi-core.so.7 -> libavahi-core.so.7.0.2
+	libgstriff-1.0.so.0 -> libgstriff-1.0.so.0.802.0
+	libXrender.so.1 -> libXrender.so.1.3.0
+	libelf.so.1 -> libelf-0.161.so
+	libxcb-composite.so.0 -> libxcb-composite.so.0.0.0
+	libORBit-imodule-2.so.0 -> libORBit-imodule-2.so.0.0.0
+	libevent_openssl-2.0.so.5 -> libevent_openssl.so
+	libxcb-shm.so.0 -> libxcb-shm.so.0.0.0
+	libgrpc++.so.3 -> libgrpc++.so.1.2.3
+	libgnutls-openssl.so.27 -> libgnutls-openssl.so.27.0.2
+	libgrpc++_unsecure.so.3 -> libgrpc++_unsecure.so.1.2.3
+	libXxf86vm.so.1 -> libXxf86vm.so.1.0.0
+	libopencv_calib3d.so.3.1 -> libopencv_calib3d.so.3.1.0
+	libevent_pthreads-2.0.so.5 -> libevent_pthreads.so
+	libnss3.so -> libnss3.so
+	libopus.so.0 -> libopus.so.0.5.2
+	libgstbadbase-1.0.so.0 -> libgstbadbase-1.0.so.0.801.0
+	libasm.so.1 -> libasm-0.161.so
+	libzbar.so.0 -> libzbar.so.0.2.0
+	libavahi-glib.so.1 -> libavahi-glib.so.1.0.2
+	libfst.so.3 -> libfst.so.3.0.0
+	libpcrecpp.so.0 -> libpcrecpp.so.0.0.1
+	libnvmm_contentpipe.so -> libnvmm_contentpipe.so
+	libavahi-common.so.3 -> libavahi-common.so.3.5.3
+	libnl-route-3.so.200 -> libnl-route-3.so.200.22.0
+	libnl-genl-3.so.200 -> libnl-genl-3.so.200.22.0
+	libpciaccess.so.0 -> libpciaccess.so.0.11.1
+	libgstcheck-0.10.so.0 -> libgstcheck-0.10.so.0.30.0
+	libv4l1.so.0 -> libv4l1.so.0.0.0
+	libnvidia-tls.so.21.5 -> libnvidia-tls.so.21.5
+	libjson-c.so.2 -> libjson-c.so.2.0.1
+	libopenblas.so.0 -> libopenblas_armv7p-r0.2.19.dev.so
+	libgstplayer-1.0.so.0 -> libgstplayer-1.0.so.0.801.0
+	libFS.so.6 -> libFS.so.6.0.0
+	libFLAC.so.8 -> libFLAC.so.8.3.0
+	libopencv_videoio.so.3.1 -> libopencv_videoio.so.3.1.0
+	libxcb-dpms.so.0 -> libxcb-dpms.so.0.0.0
+	libORBit-2.so.0 -> libORBit-2.so.0.1.0
+	libgsturidownloader-1.0.so.0 -> libgsturidownloader-1.0.so.0.801.0
+	libopusfile.so.0 -> libopusfile.so.0.4.2
+	libgnutlsxx.so.28 -> libgnutlsxx.so.28.1.0
+	libxcb-xinerama.so.0 -> libxcb-xinerama.so.0.0.0
+	libevtlog.so.0 -> libevtlog.so.0.0.0
+	libXaw.so.7 -> libXaw7.so.7.0.0
+	libnspr4.so -> libnspr4.so
+	libopencv_core.so.3.1 -> libopencv_core.so.3.1.0
+	libhogweed.so.4 -> libhogweed.so.4.1
+	libxcb-present.so.0 -> libxcb-present.so.0.0.0
+	libgcrypt.so.20 -> libgcrypt.so.20.0.4
+	libxcb-xf86dri.so.0 -> libxcb-xf86dri.so.0.0.0
+[    9.662191] EXT4-fs (mmcblk0p2): re-mounted. Opts: (null)
+Fixup OS: OK
+Starting rsyslog daemon: OK
+Configuring core dumps: Done.
+Enabling wireless...
+[   10.485033] Tegra cpuquiet clusterswitch enabled
+Prime DNS Server Set.
+# Primed DNS Set.
+Populating /dev using udev: [   14.800329] udevd[160]: starting version 3.1.5
+[   15.094194] tegra-tobor_adc 1.sound: Failed to parse DAI link to codecs
+[   15.102084] platform 1.sound: Driver tegra-tobor_adc requests probe deferral
+[   15.110711] tegra-tlv320dac3100 0.sound: ASoC: CODEC (null) not registered
+[   15.118283] tegra-tlv320dac3100 0.sound: snd_soc_register_card failed (-517)
+[   15.126562] platform 0.sound: Driver tegra-tlv320dac3100 requests probe deferral
+[   15.147903] tegra-tobor_adc 1.sound: Failed to parse DAI link to codecs
+[   15.156308] platform 1.sound: Driver tegra-tobor_adc requests probe deferral
+[   15.164451] tegra-tlv320dac3100 0.sound: ASoC: CODEC (null) not registered
+[   15.164713] tegra-vi2 vi.0: Some sensors are missing
+[   15.165885] tegra-vi2 vi.0: Some sensors are missing
+[   15.181684] tegra-tlv320dac3100 0.sound: snd_soc_register_card failed (-517)
+[   15.188927] platform 0.sound: Driver tegra-tlv320dac3100 requests probe deferral
+[   15.194320] Loading modules backported from  version 
+[   15.194323] Backport generated by backports.git 
+[   15.206834] tegra-tobor_adc 1.sound: Failed to parse DAI link to codecs
+[   15.213689] platform 1.sound: Driver tegra-tobor_adc requests probe deferral
+[   15.221830] tegra-tlv320dac3100 0.sound: ASoC: CODEC (null) not registered
+[   15.228990] tegra-tlv320dac3100 0.sound: snd_soc_register_card failed (-517)
+[   15.236226] platform 0.sound: Driver tegra-tlv320dac3100 requests probe deferral
+[   15.290223] tegra-tobor_adc 1.sound: Failed to parse DAI link to codecs
+[   15.291531] cs53l30 0-0048: Found device 53a300, revision 00
+[   15.294494] cs53l30 0-0049: Found device 53a300, revision 00
+[   15.308370] platform 1.sound: Driver tegra-tobor_adc requests probe deferral
+[   15.317781] tegra-tlv320dac3100 0.sound: dac3100-hifi <-> tegra30-i2s.3 mapping ok
+[   15.342950] tegra-tobor_adc 1.sound: multicodec <-> tegra30-i2s.1 mapping ok
+[   15.506393] cfg80211: World regulatory domain updated:
+[   15.512172] cfg80211:  DFS Master region: unset
+[   15.517063] cfg80211:   (start_freq - end_freq @ bandwidth), (max_antenna_gain, max_eirp), (dfs_cac_time)
+[   15.526840] cfg80211:   (2402000 KHz - 2472000 KHz @ 40000 KHz), (N/A, 2000 mBm), (N/A)
+[   15.535055] cfg80211:   (2457000 KHz - 2482000 KHz @ 40000 KHz), (N/A, 2000 mBm), (N/A)
+[   15.542900] SDIO Vendor ID:0097 and SDIO Device ID: 4076
+[   15.548386] cfg80211:   (2474000 KHz - 2494000 KHz @ 20000 KHz), (N/A, 2000 mBm), (N/A)
+[   15.557559] cfg80211:   (5170000 KHz - 5250000 KHz @ 80000 KHz, 160000 KHz AUTO), (N/A, 2000 mBm), (N/A)
+[   15.567206] cfg80211:   (5250000 KHz - 5330000 KHz @ 80000 KHz, 160000 KHz AUTO), (N/A, 2000 mBm), (0 s)
+[   15.576752] cfg80211:   (5490000 KHz - 5730000 KHz @ 160000 KHz), (N/A, 2000 mBm), (0 s)
+[   15.584978] cfg80211:   (5735000 KHz - 5835000 KHz @ 80000 KHz), (N/A, 2000 mBm), (N/A)
+[   15.593041] cfg80211:   (57240000 KHz - 63720000 KHz @ 2160000 KHz), (N/A, 0 mBm), (N/A)
+[   15.744969] wlcore: wl18xx HW: 183x or 180x, PG 2.2 (ROM 0x11)
+[   15.755232] Warning: enabling a non-LP0 wake source 229
+[   15.772537] wlcore: loaded
+done
+Configuring firewall: OK
+read-only file system detected...done
+Starting system message bus: done
+Starting sshd: OK
+Enabling audio...
+sh: write error: Device or resource busy
+Starting network...
+ip: can't find device 'eth0'
+ip: SIOCGIFFLAGS: No such device
+ip: SIOCGIFFLAGS: No such device
+[   17.643875] SDIO Vendor ID:0097 and SDIO Device ID: 4076
+[   17.958728] wlcore: PHY firmware version: Rev 8.2.0.0.236
+[   18.097506] wlcore: firmware booted (Rev 8.9.0.0.69)
+[   18.121189] IPv6: ADDRCONF(NETDEV_UP): wlan0: link is not ready
+udhcpc (v1.24.1) started
+Failed to kill daemon: No such file or directory
+Sending discover...
+Sending discover...
+Sending discover...
