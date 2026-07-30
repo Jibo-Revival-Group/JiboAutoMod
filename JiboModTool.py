@@ -153,19 +153,30 @@ else:
     print("[  ] Skipped Shofel2 from config.cfg , proceeding with 'dump complete'")
 print("[  ] Dump COMPLETE!")
 
-tool.extract_var_partition()
 
-
-if not tool.patchDevMode("./dump/jibo_var.bin"):
-    print("[  ] Failed writting JSON file wanna write anyway (y) or exit (n)")
-    response = input(":")
-    if response == "y":
-        pass
-    else:
+match config.Mod_Mode:
+    case "var":
+        tool.extract_var_partition()
+        
+        
+        if not tool.patchDevMode("./dump/jibo_var.bin"):
+            print("[  ] Failed writting JSON file wanna write anyway (y) or exit (n)")
+            response = input(":")
+            if response == "y":
+                pass
+            else:
+                sys.exit(1)
+        
+    case "firewall":
+        print("[  ] Mode not implemented yet, switch to var for now.. :)")
         sys.exit(1)
 
 
-        
+
+    case _:
+        print("[  ] This Shouldn happen... Check your config")
+        sys.exit(1)
+
 
 
 
