@@ -31,7 +31,148 @@ def extract_var_partition(image_path="./dump/jibo_dump.bin", output_path="./dump
         print(f"[ 󱄌 ] Error : dump wasnt found inside {image_path}, exiting...")
         sys.exit(1)
     except Exception as e:
-        print(f"[  ] Critical error : Unhandled Exception by @extract_var_partition | {e} , quitting... ") 
+        print(f"[  ] Critical error : Unhandled Exception by @extract_var_partition | {e} , quitting... ")
+
+
+def dump_var_partition_direct(output_path="./dump/jibo_var.bin", StartSector=8294434, EndSector=9318433):
+    sector_count = (EndSector - StartSector) + 1
+    
+    print(f"[󰥨  ] Dumping var partition directly (sectors {StartSector} to {EndSector})")
+    print(f"[󰥨  ] Total sectors: {sector_count}")
+    
+    # Convert to absolute path since we're changing cwd
+    abs_output_path = os.path.abspath(output_path)
+    
+    cmd = ["sudo", "./shofel2_t124", "EMMC_READ", hex(StartSector), hex(sector_count), abs_output_path]
+    print(f"[󰥨  ] Command: {' '.join(cmd)}")
+    try:
+        subprocess.check_call(cmd, cwd=SHOFEL_DIR)
+        print("\n" + "="*50)
+        print(f"[   ] Var partition dump complete!")
+        print(f"[   ] Saved to: {output_path}")
+        print("\n" + "="*50)
+        return True
+    except subprocess.CalledProcessError:
+        print("[ 󱄌 ] Error: Var partition dump failed.")
+        return False
+
+
+def compute_binary_diff(original_path, modified_path, diff_output_path):
+    print(f"[󰥨  ] Computing binary diff between original and modified...")
+    
+    try:
+        with open(original_path, "rb") as orig_file, open(modified_path, "rb") as mod_file:
+            orig_data = orig_file.read()
+            mod_data = mod_file.read()
+        
+        if len(orig_data) != len(mod_data):
+            print(f"[ 󱄌 ] Warning: File sizes differ (original: {len(orig_data)}, modified: {len(mod_data)})")
+            min_len = min(len(orig_data), len(mod_data))
+        else:
+            min_len = len(orig_data)
+        
+        # Find differing regions
+        diff_regions = []
+        in_diff = False
+        diff_start = 0
+        diff_data = bytearray()
+        
+        for i in range(min_len):
+            if orig_data[i] != mod_data[i]:
+                if not in_diff:
+                    in_diff = True
+                    diff_start = i
+                    diff_data = bytearray()
+                diff_data.append(mod_data[i])
+            else:
+                if in_diff:
+                    in_diff = False
+                    diff_regions.append((diff_start, bytes(diff_data)))
+        
+        # Handle trailing diff
+        if in_diff:
+            diff_regions.append((diff_start, bytes(diff_data)))
+        
+        # Calculate total diff size
+        total_diff_bytes = sum(len(data) for _, data in diff_regions)
+        
+        print(f"[   ] Found {len(diff_regions)} differing region(s)")
+        print(f"[   ] Total bytes to write: {total_diff_bytes} (vs {min_len} total)")
+        
+        with open(diff_output_path, "wb") as diff_file:
+            for offset, data in diff_regions:
+                diff_file.write(offset.to_bytes(4, 'little'))
+                diff_file.write(len(data).to_bytes(4, 'little'))
+                diff_file.write(data)
+        
+        print(f"[   ] Diff saved to: {diff_output_path}")
+        return diff_regions, total_diff_bytes
+        
+    except Exception as e:
+        print(f"[  ] Critical error computing diff: {e}")
+        return None, 0
+
+
+def write_diff_to_device(diff_path, partition_start_sector=8294434, sector_size=512):
+    """Write diff regions back to device using EMMC_WRITE"""
+    print(f"[󰥨  ] Writing diff regions back to device...")
+    
+    try:
+        with open(diff_path, "rb") as diff_file:
+            diff_data = diff_file.read()
+        
+        idx = 0
+        region_count = 0
+        total_bytes_written = 0
+        
+        while idx < len(diff_data):
+            if idx + 8 > len(diff_data):
+                break
+            
+            offset = int.from_bytes(diff_data[idx:idx+4], 'little')
+            data_len = int.from_bytes(diff_data[idx+4:idx+8], 'little')
+            idx += 8
+            
+            if idx + data_len > len(diff_data):
+                print(f"[ 󱄌 ] Warning: Invalid diff data at region {region_count}")
+                break
+            
+            data = diff_data[idx:idx+data_len]
+            idx += data_len
+            
+            # Calculate sector offset
+            byte_offset = offset
+            sector_offset = partition_start_sector + (byte_offset // sector_size)
+            
+            print(f"[󰥨  ] Writing region {region_count}: offset={byte_offset}, size={data_len} bytes, sector={hex(sector_offset)}")
+            
+            # Create temp file with the data
+            temp_file = f"temp_diff_region_{region_count}.bin"
+            with open(temp_file, "wb") as tf:
+                tf.write(data)
+            
+            cmd = ["sudo", "./shofel2_t124", "EMMC_WRITE", hex(sector_offset), temp_file]
+            try:
+                subprocess.check_call(cmd, cwd=SHOFEL_DIR)
+                total_bytes_written += data_len
+                region_count += 1
+                print(f"[   ] Region {region_count-1} written successfully")
+            except subprocess.CalledProcessError:
+                print(f"[ 󱄌 ] Error: Failed to write region {region_count}")
+                return False
+            finally:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+        
+        print("\n" + "="*50)
+        print(f"[   ] Delta write complete!")
+        print(f"[   ] Wrote {region_count} region(s), {total_bytes_written} bytes total")
+        print("\n" + "="*50)
+        return True
+        
+    except Exception as e:
+        print(f"[  ] Critical error writing diff: {e}")
+        return False 
 
 
 def begin_dump(StartSector=0x0, EndSector=0x1D60000 ):

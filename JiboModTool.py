@@ -145,20 +145,32 @@ if (not config.SKIP_SHOFEL):
         print("[  ] Timmed out searching for jibo")
     
     
-    emmc_dumped = tool.begin_dump()
-    if not emmc_dumped:
-        print(f"[  ] Error: Dumping process failed... exiting")
+    #dump only var partition
+    print("[  ] Using optimized delta write mode - dumping only var partition")
+    var_dumped = tool.dump_var_partition_direct("./dump/jibo_var_original.bin")
+    if not var_dumped:
+        print(f"[  ] Error: Var partition dump failed... exiting")
         sys.exit(1)
 else:
-    print("[  ] Skipped Shofel2 from config.cfg , proceeding with 'dump complete'")
+    print("[  ] Skipped Shofel2 from config.cfg , proceeding with existing dump")
+    if not os.path.exists("./dump/jibo_var_original.bin"):
+        print("[ 󱄌 ] Warning: No original var partition found, attempting extraction from full dump")
+        if os.path.exists("./dump/jibo_dump.bin"):
+            tool.extract_var_partition("./dump/jibo_dump.bin", "./dump/jibo_var_original.bin")
+        else:
+            print("[  ] Error: No dump files found. Cannot proceed.")
+            sys.exit(1)
 print("[  ] Dump COMPLETE!")
 
 
 match config.Mod_Mode:
     case "var":
-        tool.extract_var_partition()
+        # Copy original var partition to working copy
+        import shutil
+        print("[  ] Creating working copy of var partition...")
+        shutil.copy("./dump/jibo_var_original.bin", "./dump/jibo_var.bin")
         
-        
+        # Patch the working copy
         if not tool.patchDevMode("./dump/jibo_var.bin"):
             print("[  ] Failed writting JSON file wanna write anyway (y) or exit (n)")
             response = input(":")
@@ -166,6 +178,27 @@ match config.Mod_Mode:
                 pass
             else:
                 sys.exit(1)
+        
+        # Compute binary diff
+        diff_regions, diff_size = tool.compute_binary_diff(
+            "./dump/jibo_var_original.bin", 
+            "./dump/jibo_var.bin", 
+            "./dump/var_diff.bin"
+        )
+        
+        if diff_regions is None:
+            print("[  ] Error: Failed to compute diff. Exiting.")
+            sys.exit(1)
+        
+        # Write diff back to device (only if not skipping shofel)
+        if not config.SKIP_SHOFEL:
+            print("[  ] Writing delta changes back to device...")
+            if not tool.write_diff_to_device("./dump/var_diff.bin"):
+                print("[  ] Error: Failed to write diff to device. Exiting.")
+                sys.exit(1)
+        else:
+            print("[  ] Skipped device write (SKIP_SHOFEL=True)")
+            print("[  ] Patched var partition saved at: ./dump/jibo_var.bin")
         
     case "firewall":
         print("[  ] Mode not implemented yet, switch to var for now.. :)")

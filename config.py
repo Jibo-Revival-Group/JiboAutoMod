@@ -19,4 +19,4 @@ LOAD_DEV_CONFIG = True
 Mod_Mode = "var"
 
 
-SKIP_SHOFEL = True 
+SKIP_SHOFEL = False
