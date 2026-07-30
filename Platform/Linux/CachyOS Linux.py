@@ -16,13 +16,17 @@ def extract_var_partition(image_path="./dump/jibo_dump.bin", output_path="./dump
     print(f"[󰥨  ] Skipping... {StartSector} sectors ({byte_skip} bytes)")
     print(f"[󰥨  ] Reading... {sector_count} sectors ({byte_count} bytes)")
 
+    # Convert to absolute paths
+    abs_image_path = os.path.abspath(image_path)
+    abs_output_path = os.path.abspath(output_path)
+
     try:
-        with open(image_path, "rb") as in_file:
+        with open(abs_image_path, "rb") as in_file:
             in_file.seek(byte_skip)
             print(f"[  󰥥] Extracting partition to {output_path}")
 
             partition_data = in_file.read(byte_count)
-        with open(output_path, "wb") as out_file:
+        with open(abs_output_path, "wb") as out_file:
             out_file.write(partition_data)
 
         print("[ & ] Success! Partition extracted!")
@@ -40,7 +44,7 @@ def dump_var_partition_direct(output_path="./dump/jibo_var.bin", StartSector=829
     print(f"[󰥨  ] Dumping var partition directly (sectors {StartSector} to {EndSector})")
     print(f"[󰥨  ] Total sectors: {sector_count}")
     
-    # Convert to absolute path since we're changing cwd
+
     abs_output_path = os.path.abspath(output_path)
     
     cmd = ["sudo", "./shofel2_t124", "EMMC_READ", hex(StartSector), hex(sector_count), abs_output_path]
@@ -60,8 +64,13 @@ def dump_var_partition_direct(output_path="./dump/jibo_var.bin", StartSector=829
 def compute_binary_diff(original_path, modified_path, diff_output_path):
     print(f"[󰥨  ] Computing binary diff between original and modified...")
     
+    # Convert to absolute paths
+    abs_original_path = os.path.abspath(original_path)
+    abs_modified_path = os.path.abspath(modified_path)
+    abs_diff_output_path = os.path.abspath(diff_output_path)
+    
     try:
-        with open(original_path, "rb") as orig_file, open(modified_path, "rb") as mod_file:
+        with open(abs_original_path, "rb") as orig_file, open(abs_modified_path, "rb") as mod_file:
             orig_data = orig_file.read()
             mod_data = mod_file.read()
         
@@ -99,7 +108,7 @@ def compute_binary_diff(original_path, modified_path, diff_output_path):
         print(f"[   ] Found {len(diff_regions)} differing region(s)")
         print(f"[   ] Total bytes to write: {total_diff_bytes} (vs {min_len} total)")
         
-        with open(diff_output_path, "wb") as diff_file:
+        with open(abs_diff_output_path, "wb") as diff_file:
             for offset, data in diff_regions:
                 diff_file.write(offset.to_bytes(4, 'little'))
                 diff_file.write(len(data).to_bytes(4, 'little'))
@@ -113,65 +122,26 @@ def compute_binary_diff(original_path, modified_path, diff_output_path):
         return None, 0
 
 
-def write_diff_to_device(diff_path, partition_start_sector=8294434, sector_size=512):
-    """Write diff regions back to device using EMMC_WRITE"""
-    print(f"[󰥨  ] Writing diff regions back to device...")
+def write_var_partition_to_device(partition_path, StartSector=8294434, EndSector=9318433):
+    """Write entire var partition back to device in one operation"""
+    sector_count = (EndSector - StartSector) + 1
+    
+    print(f"[󰥨  ] Writing var partition back to device (sectors {StartSector} to {EndSector})")
+    print(f"[󰥨  ] Total sectors: {sector_count}")
+    
+    # Convert to absolute path
+    abs_partition_path = os.path.abspath(partition_path)
+    
+    cmd = ["sudo", "./shofel2_t124", "EMMC_WRITE", hex(StartSector), abs_partition_path]
     
     try:
-        with open(diff_path, "rb") as diff_file:
-            diff_data = diff_file.read()
-        
-        idx = 0
-        region_count = 0
-        total_bytes_written = 0
-        
-        while idx < len(diff_data):
-            if idx + 8 > len(diff_data):
-                break
-            
-            offset = int.from_bytes(diff_data[idx:idx+4], 'little')
-            data_len = int.from_bytes(diff_data[idx+4:idx+8], 'little')
-            idx += 8
-            
-            if idx + data_len > len(diff_data):
-                print(f"[ 󱄌 ] Warning: Invalid diff data at region {region_count}")
-                break
-            
-            data = diff_data[idx:idx+data_len]
-            idx += data_len
-            
-            # Calculate sector offset
-            byte_offset = offset
-            sector_offset = partition_start_sector + (byte_offset // sector_size)
-            
-            print(f"[󰥨  ] Writing region {region_count}: offset={byte_offset}, size={data_len} bytes, sector={hex(sector_offset)}")
-            
-            # Create temp file with the data
-            temp_file = f"temp_diff_region_{region_count}.bin"
-            with open(temp_file, "wb") as tf:
-                tf.write(data)
-            
-            cmd = ["sudo", "./shofel2_t124", "EMMC_WRITE", hex(sector_offset), temp_file]
-            try:
-                subprocess.check_call(cmd, cwd=SHOFEL_DIR)
-                total_bytes_written += data_len
-                region_count += 1
-                print(f"[   ] Region {region_count-1} written successfully")
-            except subprocess.CalledProcessError:
-                print(f"[ 󱄌 ] Error: Failed to write region {region_count}")
-                return False
-            finally:
-                if os.path.exists(temp_file):
-                    os.remove(temp_file)
-        
+        subprocess.check_call(cmd, cwd=SHOFEL_DIR)
         print("\n" + "="*50)
-        print(f"[   ] Delta write complete!")
-        print(f"[   ] Wrote {region_count} region(s), {total_bytes_written} bytes total")
+        print(f"[   ] Var partition write complete!")
         print("\n" + "="*50)
         return True
-        
-    except Exception as e:
-        print(f"[  ] Critical error writing diff: {e}")
+    except subprocess.CalledProcessError:
+        print("[ 󱄌 ] Error: Var partition write failed.")
         return False 
 
 
@@ -314,7 +284,8 @@ def load_msg():
     print(">>>   Arch btw based!   <<<")
 
 def patchDevMode(partition_path, target_json='{"mode":"int-developer"}'):
-   temp_file = "temp_mode.json"
+   temp_file = os.path.abspath("temp_mode.json")
+   abs_partition_path = os.path.abspath(partition_path)
    internal_path = "/jibo/mode.json"
     
     # create the JSON locally
@@ -327,14 +298,14 @@ def patchDevMode(partition_path, target_json='{"mode":"int-developer"}'):
        subprocess.run([
            "debugfs", "-w", 
            "-R", f"rm {internal_path}", 
-           partition_path
+           abs_partition_path
        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
        
        print(f"[+] Writing new {internal_path} and updating metadata...")
        result = subprocess.run([
            "debugfs", "-w", 
            "-R", f"write {temp_file} {internal_path}", 
-           partition_path
+           abs_partition_path
        ], capture_output=True, text=True)
        
        if result.returncode == 0:

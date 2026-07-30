@@ -145,12 +145,30 @@ if (not config.SKIP_SHOFEL):
         print("[  ] Timmed out searching for jibo")
     
     
-    #dump only var partition
-    print("[  ] Using optimized delta write mode - dumping only var partition")
-    var_dumped = tool.dump_var_partition_direct("./dump/jibo_var_original.bin")
-    if not var_dumped:
-        print(f"[  ] Error: Var partition dump failed... exiting")
-        sys.exit(1)
+    if config.SKIP_DUMP:
+        print("[  ] SKIP_DUMP=True, using existing dump files")
+        if not os.path.exists("./dump/jibo_var_original.bin"):
+            print("[ 󱄌 ] Warning: No original var partition found, attempting extraction from full dump")
+            if os.path.exists("./dump/jibo_dump.bin"):
+                tool.extract_var_partition("./dump/jibo_dump.bin", "./dump/jibo_var_original.bin")
+            else:
+                print("[  ] Error: No dump files found. Cannot proceed.")
+                sys.exit(1)
+    elif config.FULL_DUMP:
+        print("[  ] FULL_DUMP=True, dumping full eMMC")
+        emmc_dumped = tool.begin_dump()
+        if not emmc_dumped:
+            print(f"[  ] Error: Full dump failed... exiting")
+            sys.exit(1)
+        print("[  ] Extracting var partition from full dump...")
+        tool.extract_var_partition("./dump/jibo_dump.bin", "./dump/jibo_var_original.bin")
+    else:
+        #dump only var partition
+        print("[  ] Using optimized delta write mode - dumping only var partition")
+        var_dumped = tool.dump_var_partition_direct("./dump/jibo_var_original.bin")
+        if not var_dumped:
+            print(f"[  ] Error: Var partition dump failed... exiting")
+            sys.exit(1)
 else:
     print("[  ] Skipped Shofel2 from config.cfg , proceeding with existing dump")
     if not os.path.exists("./dump/jibo_var_original.bin"):
@@ -179,22 +197,12 @@ match config.Mod_Mode:
             else:
                 sys.exit(1)
         
-        # Compute binary diff
-        diff_regions, diff_size = tool.compute_binary_diff(
-            "./dump/jibo_var_original.bin", 
-            "./dump/jibo_var.bin", 
-            "./dump/var_diff.bin"
-        )
-        
-        if diff_regions is None:
-            print("[  ] Error: Failed to compute diff. Exiting.")
-            sys.exit(1)
-        
-        # Write diff back to device (only if not skipping shofel)
+        # Write entire patched partition back to device (only if not skipping shofel)
+        # Note: Delta write was causing filesystem corruption with secctor alignment issues
         if not config.SKIP_SHOFEL:
-            print("[  ] Writing delta changes back to device...")
-            if not tool.write_diff_to_device("./dump/var_diff.bin"):
-                print("[  ] Error: Failed to write diff to device. Exiting.")
+            print("[  ] Writing patched var partition back to device...")
+            if not tool.write_var_partition_to_device("./dump/jibo_var.bin"):
+                print("[  ] Error: Failed to write partition to device. Exiting.")
                 sys.exit(1)
         else:
             print("[  ] Skipped device write (SKIP_SHOFEL=True)")

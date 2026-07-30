@@ -20,3 +20,18 @@ Mod_Mode = "var"
 
 
 SKIP_SHOFEL = False
+
+#######################################################
+# Dump options                                          #
+# --------------------------------------------------- # 
+# | Option       | Description                       | # 
+# |==============|===================================| # 
+# |- SKIP_DUMP   | Skip dump entirely, use existing  | #
+# |              | dump files                        | #
+# |- FULL_DUMP   | Force full eMMC dump instead of   | #
+# |              | optimized var-only dump           | #
+# |==============|===================================| #
+#######################################################
+
+SKIP_DUMP = True
+FULL_DUMP = False
