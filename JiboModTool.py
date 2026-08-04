@@ -114,7 +114,7 @@ PLATFORM = get_os()
 
 
 print("[  ] Detected os : ", PLATFORM[0])
-print("[  ] Checking / Generating build enviroment")
+print("[  ] Checking build enviroment")
 
 
 tool = load_platform_module(PLATFORM)
