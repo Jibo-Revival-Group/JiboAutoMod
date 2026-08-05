@@ -60,6 +60,7 @@ Or use WSL (Windows Subsystem for Linux) and follow Linux instructions.
 ## Requirements
 
 ### Linux
+
 - Python 3.8+
 - build-essential (gcc, make)
 - libusb-1.0-dev
@@ -67,6 +68,7 @@ Or use WSL (Windows Subsystem for Linux) and follow Linux instructions.
 - ~20GB free disk space
 
 **Ubuntu/Debian:**
+
 ```bash
 sudo apt update
 sudo apt install build-essential libusb-1.0-0-dev git python3 \
@@ -74,12 +76,14 @@ sudo apt install build-essential libusb-1.0-0-dev git python3 \
 ```
 
 **Arch/CachyOS:**
+
 ```bash
 sudo pacman -S --needed base-devel libusb git python \
                         arm-none-eabi-gcc arm-none-eabi-newlib
 ```
 
 ### macOS
+
 - Python 3.8+
 - Xcode Command Line Tools (`cc`, `make`)
 - Homebrew packages: `libusb`, `pkgconf`, `arm-none-eabi-gcc`, `e2fsprogs`
@@ -89,6 +93,7 @@ sudo pacman -S --needed base-devel libusb git python \
 macOS support uses the same `jibo_automod.sh` launcher as Linux. The launcher adds Homebrew's `libusb` and keg-only `e2fsprogs` paths automatically before starting Python.
 
 ### Windows
+
 - Python 3.8+
 - MSYS2 with MinGW-w64 toolchain
 - Zadig (for USB driver installation)
@@ -103,14 +108,27 @@ macOS support uses the same `jibo_automod.sh` launcher as Linux. The launcher ad
 4. **Writes Back** - Updates only the modified partition
 5. **Verifies** - Reads back to confirm the write was successful
 
+### Workflow
+
+> These workflow diagrams are based on the current `main` branch implementation.
+> The `dev` branch has been significantly restructured and will require separate diagrams.
+
+main():
+![main Workflow](</flowcharts/main/jibo_automod.py/main().svg>)
+
+run_full_mod():
+![run_full_mod Workflow](</flowcharts/main/jibo_automod.py/run_full_mod().svg>)
+
 ## Usage
 
 ### Full Automatic Mod
+
 ```bash
 ./jibo_automod.sh
 ```
 
 ### Recommended macOS Mod
+
 On macOS, prefer the focused `/var` workflow unless you specifically want a full backup first:
 
 ```bash
@@ -152,21 +170,25 @@ jibo_gui.bat
 ```
 
 ### Just Dump (no modification)
+
 ```bash
 ./jibo_automod.sh --dump-only -o my_jibo_backup.bin
 ```
 
 ### Use Existing Dump
+
 ```bash
 ./jibo_automod.sh --dump-path /path/to/existing_dump.bin
 ```
 
 ### Write Pre-Modified Partition
+
 ```bash
 ./jibo_automod.sh --write-partition var_modified.bin --start-sector 0x7E9022
 ```
 
 ### Fast Mode (GPT + /var only)
+
 This avoids the 15GB full dump by reading just the partition table + the ~500MB `/var` partition,
 editing `/var/jibo/mode.json`, and writing back only the changed sectors.
 
@@ -182,18 +204,18 @@ If patch-writing is not desired (or your filesystem changes a lot of blocks), fo
 
 ## Command Line Options
 
-| Option | Description |
-|--------|-------------|
-| `--dump-only` | Only dump eMMC, don't modify |
-| `--dump-path FILE` | Use existing dump instead of dumping |
-| `--output, -o FILE` | Output file for dump |
-| `--start-sector HEX` | Sector for write operation (default: 0x7E9022) |
-| `--force-dump` | Re-dump even if file exists |
-| `--rebuild-shofel` | Force rebuild of exploit tool |
-| `--skip-detection` | Skip USB device detection |
-| `--no-verify` | Skip write verification |
-| `--mode-json-only` | Fast mode: dump GPT + /var only, patch `mode.json`, write back minimal changes |
-| `--full-var-write` | With `--mode-json-only`: write entire /var partition instead of patch-writing |
+| Option               | Description                                                                    |
+| -------------------- | ------------------------------------------------------------------------------ |
+| `--dump-only`        | Only dump eMMC, don't modify                                                   |
+| `--dump-path FILE`   | Use existing dump instead of dumping                                           |
+| `--output, -o FILE`  | Output file for dump                                                           |
+| `--start-sector HEX` | Sector for write operation (default: 0x7E9022)                                 |
+| `--force-dump`       | Re-dump even if file exists                                                    |
+| `--rebuild-shofel`   | Force rebuild of exploit tool                                                  |
+| `--skip-detection`   | Skip USB device detection                                                      |
+| `--no-verify`        | Skip write verification                                                        |
+| `--mode-json-only`   | Fast mode: dump GPT + /var only, patch `mode.json`, write back minimal changes |
+| `--full-var-write`   | With `--mode-json-only`: write entire /var partition instead of patch-writing  |
 
 ## Entering RCM Mode
 
@@ -266,16 +288,19 @@ python3 jibo_updater.py --ip <jibo-ip-address> --build-path V3.1/build
 ## Troubleshooting
 
 ### "Jibo not found in RCM mode"
+
 - Make sure you're holding RCM button while pressing reset
 - Try a different USB cable (data cables, not charge-only)
 - On macOS, check System Information > USB for Vendor ID `0x0955` and Product ID `0x7740`
 - On Windows, install WinUSB driver using Zadig
 
 ### "Permission denied" on Linux
+
 - Run with sudo: `sudo ./jibo_automod.sh`
 - Or add udev rules for the Nvidia APX device
 
 ### Windows: mode.json edit fails / raw patch warning
+
 If you see messages about raw edits needing padding, install `debugfs` via MSYS2 so the tool can edit the ext filesystem image safely:
 
 1. Install MSYS2: https://www.msys2.org/
@@ -285,6 +310,7 @@ If you see messages about raw edits needing padding, install `debugfs` via MSYS2
 Then re-run with `--mode-json-only`.
 
 ### macOS: missing debugfs
+
 Install Homebrew `e2fsprogs`:
 
 ```bash
@@ -300,25 +326,30 @@ python3 jibo_automod.py --mode-json-only
 ```
 
 ### macOS: Chip ID read retry
+
 After each eMMC command, Jibo returns to APX/RCM and macOS may take a moment to re-enumerate USB. If you see a warning like `Couldn't read Chip ID (attempt 1/12)`, leave Jibo connected and wait; the tool will retry before failing.
 
 If all retries fail:
+
 - reset Jibo back into RCM mode,
 - unplug/replug the USB cable if needed,
 - use a known-good data cable,
 - rerun the same command.
 
 ### Build fails
+
 - Make sure ARM toolchain is installed
 - On macOS: `brew install libusb pkgconf arm-none-eabi-gcc e2fsprogs`
 - On Arch: `pacman -S arm-none-eabi-gcc arm-none-eabi-newlib`
 - On Ubuntu: `apt install gcc-arm-none-eabi libnewlib-arm-none-eabi`
 
 ### Dump crashes near 99%
+
 - This is often OK - the last partition may be empty space
 - Check if your dump file is ~14-15GB, that's probably complete
 
 ### SSH connection refused
+
 - Make sure Jibo shows checkmark on boot
 - Verify you're using the correct IP address
 - Try `ssh -v` for debug output
@@ -345,16 +376,18 @@ JiboAutoMod/
 ## Technical Details
 
 ### Partition Layout
-| # | Size | Purpose |
-|---|------|---------|
-| 1 | 1GB | System A |
-| 2 | 1GB | System B |
-| 3 | 50MB | Boot config |
-| 4 | 2GB | Root filesystem |
-| 5 | 500MB | /var (we modify this) |
-| 6 | ~10GB | Data |
+
+| #   | Size  | Purpose               |
+| --- | ----- | --------------------- |
+| 1   | 1GB   | System A              |
+| 2   | 1GB   | System B              |
+| 3   | 50MB  | Boot config           |
+| 4   | 2GB   | Root filesystem       |
+| 5   | 500MB | /var (we modify this) |
+| 6   | ~10GB | Data                  |
 
 ### Mode Values
+
 - `"normal"` - Standard Jibo operation
 - `"int-developer"` - Developer mode (SSH enabled, services disabled)
 
@@ -485,8 +518,7 @@ The bundled `jibo_updater.py` now supports a simple interactive text UI and a sm
 - `--tui`: Launch a brief interactive text UI to pick a distribution host and release, or select a local archive under `jibo_work/updates/downloads/`.
 - `--distributors <path>`: Use `Distributors.json` (default) to get a list of release hosts to probe for latency and releases.
 
-Standalone TUI helper
----------------------
+## Standalone TUI helper
 
 If you want a more polished terminal UI, use the new `jibo_updater_tui.py` curses-based helper. It provides
 keyboard navigation and prints a JSON selection to stdout suitable for piping into other scripts.
@@ -500,15 +532,22 @@ python3 jibo_updater_tui.py --distributors Distributors.json
 The TUI outputs a JSON object describing the selected host and release, for example:
 
 ```json
-{"host": "https://code.zane.org/..", "source":"remote", "tag":"v3.3.0", "tarball_url":"https://..."}
+{
+  "host": "https://code.zane.org/..",
+  "source": "remote",
+  "tag": "v3.3.0",
+  "tarball_url": "https://..."
+}
 ```
 
 Behavior notes:
+
 - The TUI will probe hosts listed in `Distributors.json` and present latency and available releases.
 - Local archives found in `jibo_work/updates/downloads/` are shown as a "local" source and can be chosen without downloading.
 - When updating, uploaded files and directories are set to permissive `0777` to avoid boot failures caused by missing execute/read permissions.
 
 GUI integration:
+
 - `jibo_updater.py` includes a simple programmatic surface (CLI flags and a small interactive mode) designed so a GUI can call it or be wired to a future HTTP/JSON control API. For now, use `--tui` to exercise the flow; GUI hooks will be documented in `CHECKLIST.md` for the next steps.
 
 Dependencies: no additional Python packages were added for this change (uses standard library + `paramiko` already required). If you use the GUI in future, update `requirements-gui.txt` accordingly.
