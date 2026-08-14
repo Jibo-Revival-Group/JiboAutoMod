@@ -1,106 +1,20 @@
-import time
-import os
-import platform
-import sys
-import subprocess
-import importlib
-import config
-from packaging.requirements import Requirement
-from importlib.metadata import requires, version, PackageNotFoundError
+import questionary
 
 
-OS_NAME = "NOS"
-OS_VERSION = "NOVER"
-PLATFORM = (OS_NAME, OS_VERSION)
-
-def check_py_dependencies(requirements_file="requirements.txt"):
-    try:
-        missing_packages = []
-        
-        with open(requirements_file, "r") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                
-                req = Requirement(line)
-                try:
-                    installed_version = version(req.name)
-                    if not req.specifier.contains(installed_version, prereleases=True):
-                        missing_packages.append(line)
-                except PackageNotFoundError:
-                    missing_packages.append(line)
-
-        if missing_packages:
-            print(f"[  ] Missing packages: {', '.join(missing_packages)}")
-            print("[  ] Installing pkgs...")
-            
-            cmd = [sys.executable, "-m", "pip", "install", "-r", requirements_file]
-            
-            # If on Linux/macOS and NOT in a virtual environment, append the bypass flag
-            # (In Windows, or inside a venv, this isn't needed)
-            in_venv = sys.prefix != sys.base_prefix
-            if sys.platform != "win32" and not in_venv:
-                cmd.append("--break-system-packages")
-                
-            subprocess.check_call(cmd)
-            
-            print("\n" + "="*50)
-            print("[ 󱝎 ] All missing dependencies have been successfully installed!")
-            print("[ 󱄌 ] Please RESTART the application now.")
-            print("="*50 + "\n")
-            sys.exit(0)
-            
-    except FileNotFoundError:
-        print(f"[  ] Error: '{requirements_file}' not found.")
-        sys.exit(1)
 
 
-def get_os():
-    os_name = platform.system()
-
-    if os_name == "Linux":
-        try:
-            info = platform.freedesktop_os_release()
-            distro = info.get("NAME", "Unknown Linux")
-            return ("Linux", str(distro))
-        except (AttributeError, KeyError, FileNotFoundError):
-
-            return ("Linux", "Unknown Linux")
-    elif os_name == "Windows":
-        return ("Windows", str(platform.release()))
-    else:
-        return os_name
-
-def load_platform_module(PLATFORM):
-    os_name , os_version = PLATFORM
 
 
-    os_dir = os.path.join("Platform",os_name)
-    if not os.path.isdir(os_dir):
-        print(f"[  ] (@load_platform_module) Critical Error: Operating System: {os_name} is not supported yet")
-        print(f"[  ] You can be the first one to contribute for {os_name} {os_version}! , Create a PR over at: ")
-        print("[  ] https://github.com/Jibo-Revival-Group/JiboAutoMod or Let us know by making a issue there! ")
-
-    specific_module_path = f"Platform.{os_name}.{os_version}"
-    try:
-        platform_module = importlib.import_module(specific_module_path)
-        print(f"[ 󰏖 ] Loaded denfinitions for {os_name} thats build for {os_version}!")
-        return platform_module
-    except ModuleNotFoundError as error:
-        if error.name == specific_module_path:
-            default_module_path = f"Platform.{os_name}.Default"
-            try:
-                platform_module = importlib.import_module(default_module_path)
-                print(f"[  ] Found generic denfinitios for {os_name}, should work for {os_version}")
-                return platform_module
-            except ModuleNotFoundError:
-                print(f"[  ] (@load_platform_module) Critical Error : Failed to find Default denfinitions for {os_name}, maybe re-pull source?")
-                sys.exit(1)
-        else:
-            raise error
 
 
+
+
+
+
+
+
+
+# ============================================== START <<<<<<<<<<<<<<<<<<<
 print("Jibo Modding tool v2 | RELEASE 0.1a")
 print("Use nerdfont as a font if youre missing icons")
 print("If your distro/os isnt supported you can contribute your own config to: ")
@@ -108,121 +22,7 @@ print("https://github.com/Jibo-Revival-Group/JiboAutoMod")
 print("Initialising python dependencies...")
 
 
-check_py_dependencies()
-PLATFORM = get_os()
-        
 
-
-print("[  ] Detected os : ", PLATFORM[0])
-print("[  ] Checking build enviroment")
-
-
-tool = load_platform_module(PLATFORM)
-
-tool.load_msg()
-deps = tool.check_build_dependencies()
-tool.install_build_dependencies(deps)
-
-print("[  ] Build enviroment is ready!")
-print("[  ] Checking for Shofel2")
-if (not config.SKIP_SHOFEL): 
-    if not tool.check_shofel_built():
-        shofel_build = tool.build_shofel()
-        if not shofel_build:
-            print("[  ] (@if not shofel_build) Critical Error: Shofel Building proceedure failed, cannot proceed!")
-            sys.exit(1)
-    
-    print("[  ] Shofel2 is ready for excecurion!")
-    print("[  ] Scanning for Jibo (Nvidia APX)")
-    
-    timeout_attempts = 100
-    jibo_connected = False
-    while (timeout_attempts >= 0) and not jibo_connected:
-        timeout_attempts = timeout_attempts - 1
-        jibo_connected = tool.is_jibo_present()
-        time.sleep(1)
-    if timeout_attempts <= 0:
-        print("[  ] Timmed out searching for jibo")
-    
-    
-    if config.SKIP_DUMP:
-        print("[  ] SKIP_DUMP=True, using existing dump files")
-        if not os.path.exists("./dump/jibo_var_original.bin"):
-            print("[ 󱄌 ] Warning: No original var partition found, attempting extraction from full dump")
-            if os.path.exists("./dump/jibo_dump.bin"):
-                tool.extract_var_partition("./dump/jibo_dump.bin", "./dump/jibo_var_original.bin")
-            else:
-                print("[  ] Error: No dump files found. Cannot proceed.")
-                sys.exit(1)
-    elif config.FULL_DUMP:
-        print("[  ] FULL_DUMP=True, dumping full eMMC")
-        emmc_dumped = tool.begin_dump()
-        if not emmc_dumped:
-            print(f"[  ] Error: Full dump failed... exiting")
-            sys.exit(1)
-        print("[  ] Extracting var partition from full dump...")
-        tool.extract_var_partition("./dump/jibo_dump.bin", "./dump/jibo_var_original.bin")
-    else:
-        #dump only var partition
-        print("[  ] Using optimized delta write mode - dumping only var partition")
-        var_dumped = tool.dump_var_partition_direct("./dump/jibo_var_original.bin")
-        if not var_dumped:
-            print(f"[  ] Error: Var partition dump failed... exiting")
-            sys.exit(1)
-else:
-    print("[  ] Skipped Shofel2 from config.cfg , proceeding with existing dump")
-    if not os.path.exists("./dump/jibo_var_original.bin"):
-        print("[ 󱄌 ] Warning: No original var partition found, attempting extraction from full dump")
-        if os.path.exists("./dump/jibo_dump.bin"):
-            tool.extract_var_partition("./dump/jibo_dump.bin", "./dump/jibo_var_original.bin")
-        else:
-            print("[  ] Error: No dump files found. Cannot proceed.")
-            sys.exit(1)
-print("[  ] Dump COMPLETE!")
-
-
-match config.Mod_Mode:
-    case "var":
-        # Copy original var partition to working copy
-        import shutil
-        print("[  ] Creating working copy of var partition...")
-        shutil.copy("./dump/jibo_var_original.bin", "./dump/jibo_var.bin")
-        
-        # Patch the working copy
-        if not tool.patchDevMode("./dump/jibo_var.bin"):
-            print("[  ] Failed writting JSON file wanna write anyway (y) or exit (n)")
-            response = input(":")
-            if response == "y":
-                pass
-            else:
-                sys.exit(1)
-        
-        # Write entire patched partition back to device (only if not skipping shofel)
-        # Note: Delta write was causing filesystem corruption with secctor alignment issues
-        if not config.SKIP_SHOFEL:
-            print("[  ] Writing patched var partition back to device...")
-            if not tool.write_var_partition_to_device("./dump/jibo_var.bin"):
-                print("[  ] Error: Failed to write partition to device. Exiting.")
-                sys.exit(1)
-        else:
-            print("[  ] Skipped device write (SKIP_SHOFEL=True)")
-            print("[  ] Patched var partition saved at: ./dump/jibo_var.bin")
-        
-    case "firewall":
-        print("[  ] Mode not implemented yet, switch to var for now.. :)")
-        sys.exit(1)
-
-
-
-    case _:
-        print("[  ] This Shouldn happen... Check your config")
-        sys.exit(1)
-
-
-
-
-
-
-
+toolMode = questionary.select("Select Tool", ["Robot Unlocking Tools","Robot Manager [WIP]","Jibo Package Manager [WIP]","Jibo Server Tools","Exit"],qmark="",pointer="").ask()
 
 
