@@ -18,6 +18,10 @@ LOAD_DEV_CONFIG = True
 
 Mod_Mode = "var"
 
+# Firewall plugin options. The normal Dev menu path opens SSH access while
+# preserving mode.json; set this to True for an explicit recovery run.
+FIREWALL_RESTORE = False
+
 
 SKIP_SHOFEL = False
 
