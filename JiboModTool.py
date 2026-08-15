@@ -1,9 +1,29 @@
 import importlib
 import subprocess
-import platform
 import sys
+import os
+import importlib.util
+from pathlib import Path
 from packaging.requirements import Requirement
 from importlib.metadata import requires, version, PackageNotFoundError
+from contextlib import contextmanager
+
+@contextmanager
+def execution_environment(run_dir: str):
+    abs_run_dir = str(Path(run_dir).resolve())
+    original_cwd = os.getcwd()
+
+    # 1. Add run_dir to sys.path so importlib.import_module("Platform...") finds the package
+    sys.path.insert(0, abs_run_dir)
+    # 2. Change CWD for relative file checks (e.g. os.path.isdir("Platform/..."))
+    os.chdir(abs_run_dir)
+
+    try:
+        yield
+    finally:
+        os.chdir(original_cwd)
+        if abs_run_dir in sys.path:
+            sys.path.remove(abs_run_dir)
 
 class Color:
     # Styles
@@ -22,7 +42,6 @@ class Color:
     MAGENTA = "\033[35m"
     CYAN = "\033[36m"
     WHITE = "\033[37m"
-
 
 
 
@@ -72,6 +91,29 @@ def check_py_dependencies(requirements_file="requirements.txt"):
 
 
 
+
+
+def run_script(script_path: str):
+    path = Path(script_path).resolve()
+    # Automatically get the parent directory (e.g., /home/eva/Documents/JiboAutoMod/Exploits)
+    run_dir = path.parent
+    module_name = path.stem
+
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load module from {script_path}")
+
+    module = importlib.util.module_from_spec(spec)
+
+    # CRITICAL: exec_module must be wrapped INSIDE the context manager
+    # because ShofelExploit.py calls load_platform_module() at top-level load time!
+    with execution_environment(run_dir):
+        spec.loader.exec_module(module)
+        
+        # If ShofelExploit.py also has a main() function:
+        if hasattr(module, "main"):
+            return module.main()
+
 def rut_menu():
     print("===[ ROBOT UNLOCKING TOOLS ]===")
     print("If ou happen to want to contribute to this section make " + Color.BOLD + Color.UNDERLINE+ "sure you make a branch with the /exploits/ prefix" + Color.RESET)
@@ -85,7 +127,12 @@ def rut_menu():
 
     selected_exploit = questionary.select("Choose an exploit", choices=exploits).ask()
 
-    print(selected_exploit)
+    run_script(selected_exploit["path"])
+
+    
+
+    
+
 
 
     
