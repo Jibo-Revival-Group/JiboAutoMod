@@ -15,14 +15,24 @@ import os
 import sys
 import json
 import struct
+import zlib
 import shutil
 import hashlib
 import platform
 import subprocess
 import argparse
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Tuple, List
 from dataclasses import dataclass
+
+from firewall_patch import (
+    FILE_SHA256_ORIGINAL,
+    FILE_SHA256_PATCHED,
+    FirewallPatchError,
+    build_sector_patch,
+    inspect_firewall_image,
+)
 
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -683,6 +693,51 @@ def parse_gpt_partitions(dump_path: Path) -> List[PartitionInfo]:
     return partitions
 
 
+def validate_gpt_integrity(dump_path: Path) -> None:
+    """Validate primary GPT header and entry-array CRCs in a bounded dump."""
+    data = dump_path.read_bytes()
+    if len(data) < 2 * EMMC_SECTOR_SIZE:
+        raise ValueError("GPT dump is too small")
+
+    header_offset = EMMC_SECTOR_SIZE
+    header_sector = data[header_offset:header_offset + EMMC_SECTOR_SIZE]
+    if header_sector[:8] != b"EFI PART":
+        raise ValueError("primary GPT signature is missing")
+
+    header_size = struct.unpack("<I", header_sector[12:16])[0]
+    if header_size < 92 or header_size > EMMC_SECTOR_SIZE:
+        raise ValueError(f"invalid GPT header size: {header_size}")
+    expected_header_crc = struct.unpack("<I", header_sector[16:20])[0]
+    header_for_crc = bytearray(header_sector[:header_size])
+    header_for_crc[16:20] = b"\0\0\0\0"
+    actual_header_crc = zlib.crc32(header_for_crc) & 0xFFFFFFFF
+    if actual_header_crc != expected_header_crc:
+        raise ValueError(
+            f"GPT header CRC mismatch: expected 0x{expected_header_crc:08x}, "
+            f"got 0x{actual_header_crc:08x}"
+        )
+
+    entries_lba = struct.unpack("<Q", header_sector[72:80])[0]
+    entry_count = struct.unpack("<I", header_sector[80:84])[0]
+    entry_size = struct.unpack("<I", header_sector[84:88])[0]
+    expected_entries_crc = struct.unpack("<I", header_sector[88:92])[0]
+    if entry_count <= 0 or entry_size < 128 or entry_size % 8:
+        raise ValueError(
+            f"invalid GPT entry geometry: count={entry_count}, size={entry_size}"
+        )
+    entries_offset = entries_lba * EMMC_SECTOR_SIZE
+    entries_length = entry_count * entry_size
+    entries_end = entries_offset + entries_length
+    if entries_offset < 2 * EMMC_SECTOR_SIZE or entries_end > len(data):
+        raise ValueError("GPT entry array is outside the bounded dump")
+    actual_entries_crc = zlib.crc32(data[entries_offset:entries_end]) & 0xFFFFFFFF
+    if actual_entries_crc != expected_entries_crc:
+        raise ValueError(
+            f"GPT entry-array CRC mismatch: expected 0x{expected_entries_crc:08x}, "
+            f"got 0x{actual_entries_crc:08x}"
+        )
+
+
 def parse_partitions_fdisk(dump_path: Path) -> List[PartitionInfo]:
     """Parse partitions using fdisk (Linux fallback)"""
     partitions = []
@@ -736,6 +791,29 @@ def find_var_partition(partitions: List[PartitionInfo]) -> Optional[PartitionInf
             return part
     
     return None
+
+
+def find_rootfs_partitions(partitions: List[PartitionInfo]) -> Optional[dict]:
+    """Return exact rootfsA/rootfsB GPT matches; never infer them by position."""
+    aliases = {"rootfsa": "rootfsA", "rootfsb": "rootfsB"}
+    found = {}
+    for part in partitions:
+        normalized = "".join(character for character in part.name.lower() if character.isalnum())
+        slot = aliases.get(normalized)
+        if not slot:
+            continue
+        if slot in found:
+            print_error(f"GPT contains duplicate {slot} partitions")
+            return None
+        found[slot] = part
+
+    if set(found) != {"rootfsA", "rootfsB"}:
+        print_error(
+            "GPT must contain exactly one partition named rootfsA and one named rootfsB; "
+            f"found: {', '.join(sorted(found)) or 'none'}"
+        )
+        return None
+    return found
 
 
 
@@ -1030,6 +1108,7 @@ def emmc_read_to_file(output_path: Path, start_sector: int, num_sectors: int) ->
         return False
 
     try:
+        output_path.unlink(missing_ok=True)
         cmd = [
             str(shofel),
             "EMMC_READ",
@@ -1041,7 +1120,15 @@ def emmc_read_to_file(output_path: Path, start_sector: int, num_sectors: int) ->
             cmd = ["sudo"] + cmd
         subprocess.run(cmd, cwd=SHOFEL_DIR, check=True)
         pause_for_rcm_reenumeration()
-        return output_path.exists()
+        expected_size = num_sectors * EMMC_SECTOR_SIZE
+        actual_size = output_path.stat().st_size if output_path.exists() else -1
+        if actual_size != expected_size:
+            print_error(
+                f"EMMC_READ size mismatch for {output_path}: "
+                f"expected {expected_size} bytes, got {actual_size}"
+            )
+            return False
+        return True
     except subprocess.CalledProcessError as e:
         print_error(f"EMMC_READ failed: {e}")
         return False
@@ -1583,6 +1670,194 @@ def run_mode_json_only(args) -> bool:
     return True
 
 
+def _append_firewall_log(log_path: Path, record: dict) -> None:
+    """Append one durable JSON record for discovery, write, or verification."""
+    record = {
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        **record,
+    }
+    with log_path.open("a", encoding="utf-8") as log_file:
+        log_file.write(json.dumps(record, sort_keys=True) + "\n")
+        log_file.flush()
+
+
+def run_firewall_only(args) -> bool:
+    """Patch only S21firewall in both rootfs slots and verify every sector write."""
+    print_banner()
+    desired_state = "original" if args.restore_firewall else "patched"
+    action = "restore" if args.restore_firewall else "open"
+    print_info(f"Running fail-closed firewall-only mode ({action})")
+    print_info("This does not change /var/jibo/mode.json")
+
+    if not report_dependency_check(require_ext_editor=False):
+        return False
+
+    WORK_DIR.mkdir(parents=True, exist_ok=True)
+    log_path = WORK_DIR / "firewall_patch_log.jsonl"
+
+    if not build_shofel(force_rebuild=args.rebuild_shofel):
+        return False
+    if not args.skip_detection and not wait_for_jibo_rcm(timeout=120):
+        return False
+
+    gpt_path = WORK_DIR / "firewall_gpt_dump.bin"
+    gpt_sectors = 4096
+    print_info(f"Reading bounded GPT region ({gpt_sectors} sectors)...")
+    if not emmc_read_to_file(gpt_path, 0, gpt_sectors):
+        return False
+
+    try:
+        validate_gpt_integrity(gpt_path)
+    except (OSError, ValueError) as error:
+        print_error(f"GPT validation failed: {error}")
+        _append_firewall_log(
+            log_path,
+            {"operation": action, "result": "aborted-invalid-gpt", "error": str(error)},
+        )
+        return False
+
+    partitions = parse_gpt_partitions(gpt_path)
+    rootfs_partitions = find_rootfs_partitions(partitions)
+    if not rootfs_partitions:
+        _append_firewall_log(log_path, {"operation": action, "result": "aborted-invalid-gpt"})
+        return False
+
+    # Preflight both slots completely before the first write. A failure in one
+    # slot therefore cannot leave the robot booting two unvalidated layouts.
+    plans = []
+    for slot in ("rootfsA", "rootfsB"):
+        partition = rootfs_partitions[slot]
+        image_path = WORK_DIR / f"{slot}.original.img"
+        print_info(
+            f"Reading {slot}: start=0x{partition.start_sector:x}, "
+            f"sectors=0x{partition.size_sectors:x}"
+        )
+        if not emmc_read_to_file(image_path, partition.start_sector, partition.size_sectors):
+            _append_firewall_log(
+                log_path,
+                {"operation": action, "slot": slot, "result": "aborted-read-failed"},
+            )
+            return False
+
+        try:
+            match = inspect_firewall_image(image_path)
+            patch = build_sector_patch(match, restore=args.restore_firewall)
+        except (OSError, FirewallPatchError) as error:
+            print_error(f"{slot} validation failed: {error}")
+            _append_firewall_log(
+                log_path,
+                {
+                    "operation": action,
+                    "slot": slot,
+                    "partition_start_sector": partition.start_sector,
+                    "partition_size_sectors": partition.size_sectors,
+                    "result": "aborted-signature-validation",
+                    "error": str(error),
+                },
+            )
+            return False
+
+        _append_firewall_log(
+            log_path,
+            {
+                "operation": action,
+                "slot": slot,
+                "partition_start_sector": partition.start_sector,
+                "partition_size_sectors": partition.size_sectors,
+                "partition_sha256": match.image_sha256,
+                "partition_byte_offset": match.assignment_offset,
+                "emmc_byte_offset": partition.start_sector * EMMC_SECTOR_SIZE + match.assignment_offset,
+                "patch_partition_start_sector": patch.start_sector,
+                "patch_emmc_start_sector": partition.start_sector + patch.start_sector,
+                "patch_sector_count": patch.sector_count,
+                "detected_state": match.state,
+                "firewall_file_sha256_before": match.firewall_file_sha256,
+                "firewall_file_sha256_after": (
+                    FILE_SHA256_ORIGINAL if args.restore_firewall else FILE_SHA256_PATCHED
+                ),
+                "sector_sha256_before": patch.before_sha256,
+                "sector_sha256_after": patch.after_sha256,
+                "result": "validated",
+            },
+        )
+        plans.append((slot, partition, match, patch))
+
+    if not args.skip_detection:
+        print_info("Both slots validated. Ensure Jibo remains in RCM mode.")
+        if not wait_for_jibo_rcm(timeout=60):
+            print_error("RCM device disappeared; refusing to begin writes")
+            return False
+
+    for slot, partition, match, patch in plans:
+        if match.state == desired_state:
+            print_success(f"{slot} is already {desired_state}; no write needed")
+            _append_firewall_log(
+                log_path,
+                {"operation": action, "slot": slot, "result": "already-desired-state"},
+            )
+            continue
+
+        sector_backup = WORK_DIR / f"{slot}.firewall-sector.backup.bin"
+        sector_payload = WORK_DIR / f"{slot}.firewall-sector.{desired_state}.bin"
+        sector_readback = WORK_DIR / f"{slot}.firewall-sector.readback.bin"
+        sector_backup.write_bytes(patch.before)
+        sector_payload.write_bytes(patch.after)
+
+        emmc_start_sector = partition.start_sector + patch.start_sector
+        print_info(
+            f"Writing {patch.sector_count} sector(s) to {slot} at eMMC sector "
+            f"0x{emmc_start_sector:x}"
+        )
+        if not emmc_write_file(sector_payload, emmc_start_sector):
+            _append_firewall_log(
+                log_path,
+                {"operation": action, "slot": slot, "result": "write-failed"},
+            )
+            return False
+
+        if not emmc_read_to_file(sector_readback, emmc_start_sector, patch.sector_count):
+            _append_firewall_log(
+                log_path,
+                {"operation": action, "slot": slot, "result": "readback-failed"},
+            )
+            return False
+
+        readback = sector_readback.read_bytes()
+        readback_hash = hashlib.sha256(readback).hexdigest()
+        if readback != patch.after:
+            print_error(f"{slot} read-back differs from the exact patch payload")
+            _append_firewall_log(
+                log_path,
+                {
+                    "operation": action,
+                    "slot": slot,
+                    "sector_sha256_expected": patch.after_sha256,
+                    "sector_sha256_readback": readback_hash,
+                    "result": "verification-failed",
+                },
+            )
+            return False
+
+        print_success(f"{slot} write verified: {readback_hash}")
+        _append_firewall_log(
+            log_path,
+            {
+                "operation": action,
+                "slot": slot,
+                "sector_sha256_before": patch.before_sha256,
+                "sector_sha256_after": patch.after_sha256,
+                "sector_sha256_readback": readback_hash,
+                "result": "verified",
+            },
+        )
+
+    print_success(f"Firewall {action} operation completed for rootfsA and rootfsB")
+    print_info(f"Recovery images, original sectors, and audit log are in: {WORK_DIR}")
+    if not args.restore_firewall:
+        print_info("Boot normally, confirm the robot gets an IP, then test TCP/22 and SSH.")
+    return True
+
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -1606,6 +1881,8 @@ Examples:
                            help="Write a partition file to Jibo (requires --start-sector)")
     mode_group.add_argument("--mode-json-only", action="store_true",
                            help="Fast mode: dump GPT + /var only, patch /var/jibo/mode.json, write back minimal changes")
+    mode_group.add_argument("--firewall-only", action="store_true",
+                           help="Patch S21firewall in rootfsA/rootfsB without changing mode.json")
     
     parser.add_argument("--dump-path", metavar="FILE",
                        help="Use existing dump file instead of dumping")
@@ -1627,6 +1904,8 @@ Examples:
                        help="With --mode-json-only: write entire /var partition instead of patch-writing changed sectors")
     parser.add_argument("--restore-normal", action="store_true",
                        help="With --mode-json-only: restore /var/jibo/mode.json to normal mode")
+    parser.add_argument("--restore-firewall", action="store_true",
+                       help="With --firewall-only: restore the original jibo-getmode assignment")
     
     args = parser.parse_args()
     
@@ -1634,6 +1913,10 @@ Examples:
         parser.error("--write-partition requires --start-sector")
     if args.restore_normal and not args.mode_json_only:
         parser.error("--restore-normal requires --mode-json-only")
+    if args.restore_firewall and not args.firewall_only:
+        parser.error("--restore-firewall requires --firewall-only")
+    if args.firewall_only and not args.verify:
+        parser.error("--firewall-only requires read-back verification; remove --no-verify")
     
     try:
         if args.dump_only:
@@ -1643,6 +1926,8 @@ Examples:
             success = run_write_only(args)
         elif args.mode_json_only:
             success = run_mode_json_only(args)
+        elif args.firewall_only:
+            success = run_firewall_only(args)
         else:
             success = run_full_mod(args)
         

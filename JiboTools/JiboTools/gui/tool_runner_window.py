@@ -50,6 +50,7 @@ class ToolRunnerWindow(QObject):
         self._host_field = require_child(self.window, "hostField", QLineEdit)
         self._extra_args = require_child(self.window, "extraArgsField", QLineEdit)
         self._description = require_child(self.window, "descriptionLabel", QLabel)
+        self._firewall_only = require_child(self.window, "firewallOnlyCheck", QCheckBox)
         self._use_existing_dump = require_child(self.window, "useExistingDumpCheck", QCheckBox)
         self._dump_path = require_child(self.window, "dumpPathField", QLineEdit)
         self._browse_dump = require_child(self.window, "browseDumpButton", QPushButton)
@@ -63,6 +64,7 @@ class ToolRunnerWindow(QObject):
 
         self._host_field.setVisible(self._is_updater)
 
+        self._firewall_only.setVisible(self._is_installer)
         self._use_existing_dump.setVisible(self._is_installer)
         self._dump_path.setVisible(self._is_installer)
         self._browse_dump.setVisible(self._is_installer)
@@ -71,9 +73,9 @@ class ToolRunnerWindow(QObject):
 
         if self._is_installer:
             self._description.setText(
-                "This installer will: build Shofel, dump eMMC (or use an existing dump), "
-                "analyze partitions, modify /var/jibo/mode.json to enable developer mode, "
-                "write the modified /var partition back, and optionally verify.\n"
+                "Choose 'Open SSH firewall only' to preserve normal mode while validating and "
+                "patching both rootfs slots with mandatory read-back. Leave it unchecked for the "
+                "legacy mode.json developer-mode workflow.\n"
                 "Warning: Do not disconnect the robot during reads/writes."
             )
         elif self._is_updater:
@@ -87,6 +89,7 @@ class ToolRunnerWindow(QObject):
         self._browse_dump.setEnabled(False)
 
         self._use_existing_dump.toggled.connect(self._sync_dump_widgets)
+        self._firewall_only.toggled.connect(self._sync_dump_widgets)
         self._browse_dump.clicked.connect(self._pick_dump_path)
         self._sync_dump_widgets()
 
@@ -123,10 +126,14 @@ class ToolRunnerWindow(QObject):
         extra = self._extra_args.text().strip()
         extra_args: list[str] = shlex.split(extra) if extra else []
 
-        if self._is_installer and self._use_existing_dump.isChecked():
+        if (self._is_installer and self._use_existing_dump.isChecked()
+                and not self._firewall_only.isChecked()):
             dump_path = self._dump_path.text().strip()
             if dump_path and "--dump-path" not in extra_args:
                 extra_args += ["--dump-path", dump_path]
+
+        if self._is_installer and self._firewall_only.isChecked() and "--firewall-only" not in extra_args:
+            extra_args += ["--firewall-only"]
 
         if extra_args:
             args += extra_args
@@ -138,10 +145,13 @@ class ToolRunnerWindow(QObject):
         if self.runner.running:
             self.runner.stop()
         else:
-            if self._is_installer and self._use_existing_dump.isChecked() and not self._dump_path.text().strip():
+            if (self._is_installer and self._use_existing_dump.isChecked()
+                    and not self._firewall_only.isChecked()
+                    and not self._dump_path.text().strip()):
                 self._status.setText("Pick a dump file (or uncheck 'existing dump')")
                 return
-            if self._is_installer and self._use_existing_dump.isChecked():
+            if (self._is_installer and self._use_existing_dump.isChecked()
+                    and not self._firewall_only.isChecked()):
                 p = Path(self._dump_path.text().strip())
                 if not p.exists():
                     self._status.setText("Dump file not found")
@@ -206,7 +216,8 @@ class ToolRunnerWindow(QObject):
 
     @Slot(bool)
     def _sync_dump_widgets(self, checked: bool | None = None) -> None:
-        enabled = bool(checked) if checked is not None else self._use_existing_dump.isChecked()
+        enabled = self._use_existing_dump.isChecked() and not self._firewall_only.isChecked()
+        self._use_existing_dump.setEnabled(not self._firewall_only.isChecked())
         self._dump_path.setEnabled(enabled)
         self._browse_dump.setEnabled(enabled)
 

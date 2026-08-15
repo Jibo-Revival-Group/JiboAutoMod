@@ -202,6 +202,27 @@ If patch-writing is not desired (or your filesystem changes a lot of blocks), fo
 ./jibo_automod.sh --mode-json-only --full-var-write
 ```
 
+### Firewall-only mode (preserve normal mode)
+
+This fail-closed path reads GPT plus `rootfsA` and `rootfsB`, finds the known
+`S21firewall` control-flow signature by content, patches only the assignment
+line, writes the minimal aligned sector payload, and requires exact read-back.
+It does not change `/var/jibo/mode.json`.
+
+```bash
+./jibo_automod.sh --firewall-only
+```
+
+Restore both slots with:
+
+```bash
+./jibo_automod.sh --firewall-only --restore-firewall
+```
+
+The optional GUI exposes the same path as **Open SSH firewall only**. See
+[the firewall-only design and recovery guide](docs/firewall-only.md) for the
+signature, fail-closed rules, audit fields, and post-boot checks.
+
 ## Command Line Options
 
 | Option               | Description                                                                    |
@@ -216,6 +237,8 @@ If patch-writing is not desired (or your filesystem changes a lot of blocks), fo
 | `--no-verify`        | Skip write verification                                                        |
 | `--mode-json-only`   | Fast mode: dump GPT + /var only, patch `mode.json`, write back minimal changes |
 | `--full-var-write`   | With `--mode-json-only`: write entire /var partition instead of patch-writing  |
+| `--firewall-only`    | Validate and patch `S21firewall` in both rootfs slots; preserve `mode.json`     |
+| `--restore-firewall` | With `--firewall-only`: restore the original assignment in both slots           |
 
 ## Entering RCM Mode
 

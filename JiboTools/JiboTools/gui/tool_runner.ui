@@ -109,6 +109,16 @@
          </widget>
         </item>
         <item>
+         <widget class="QCheckBox" name="firewallOnlyCheck">
+          <property name="text">
+           <string>Open SSH firewall only (preserve the robot's normal mode)</string>
+          </property>
+          <property name="toolTip">
+           <string>Validates and patches S21firewall in rootfsA and rootfsB, writes minimal sectors, and verifies read-back.</string>
+          </property>
+         </widget>
+        </item>
+        <item>
          <layout class="QHBoxLayout" name="dumpLayout">
             <property name="spacing">
              <number>10</number>

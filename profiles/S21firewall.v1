@@ -1,0 +1,116 @@
+#!/bin/sh
+#
+# Jibo Firewall init script
+#
+
+set -e
+
+IPTABLES_CMDS="/usr/sbin/iptables /usr/sbin/ip6tables"
+
+flush_rules() {
+    for iptables in $IPTABLES_CMDS; do
+        $iptables -t filter -F
+        $iptables -t filter -P INPUT ACCEPT
+        $iptables -t filter -P FORWARD ACCEPT
+        $iptables -t filter -P OUTPUT ACCEPT
+        # add the DYNAMIC_ACCESS chain unconditionally
+        $iptables -t filter -X
+        $iptables -t filter -N DYNAMIC_ACCESS
+    done
+}
+
+normal_rules() {
+    for iptables in $IPTABLES_CMDS; do
+        $iptables -t filter -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+        $iptables -t filter -A INPUT -p icmp -j ACCEPT
+        $iptables -t filter -A INPUT -i lo -j ACCEPT
+        # allow dynamic access rules from system-manager
+        $iptables -t filter -A INPUT -j DYNAMIC_ACCESS
+        $iptables -t filter -A INPUT -j REJECT
+        $iptables -t filter -A FORWARD -j REJECT
+    done
+}
+
+developer_rules() {
+    for iptables in $IPTABLES_CMDS; do
+        # jibo-dev-shell
+        $iptables -t filter -A INPUT -p tcp --syn --dport 8686 -j ACCEPT
+        # jibo-skills-service
+        $iptables -t filter -A INPUT -p tcp --syn --dport 8779 -j ACCEPT
+        # jibo-sync
+        $iptables -t filter -A INPUT -p tcp --syn --dport 8989 -j ACCEPT
+        # jibo-debug-proxy
+        $iptables -t filter -A INPUT -p tcp --syn --dport 9191 -j ACCEPT
+        # avahi
+        $iptables -t filter -A INPUT -p udp --dport 5353 -j ACCEPT
+    done
+    normal_rules
+}
+
+certification_rules() {
+    for iptables in $IPTABLES_CMDS; do
+        # jibo-certification-service
+        $iptables -t filter -A INPUT -p tcp --syn --dport 9292 -j ACCEPT
+    done
+    normal_rules
+}
+
+service_rules() {
+    for iptables in $IPTABLES_CMDS; do
+        # jibo-certification-service
+        $iptables -t filter -A INPUT -p tcp --syn --dport 9292 -j ACCEPT
+        # jibo-service-center-service
+        $iptables -t filter -A INPUT -p tcp --syn --dport 9797 -j ACCEPT
+        # avahi
+        $iptables -t filter -A INPUT -p udp --dport 5353 -j ACCEPT
+    done
+    normal_rules
+}
+
+start() {
+    echo -n "Configuring firewall: "
+    flush_rules
+    my_mode=$(/usr/bin/jibo-getmode)
+    if [ $? -ne 0 ]; then
+        echo "Unspecified mode. SKIP"
+    elif [ "$my_mode" == "identified" ]; then
+        echo "IDENTIFIED"
+    elif [ "$my_mode" == "int-developer" ]; then
+        echo "INT-DEVELOPER"
+    elif [ "$my_mode" == "developer" ]; then
+        developer_rules
+        test $? -eq 0 && echo "DEVELOPER" || echo "ERROR"
+    elif [ "$my_mode" == "certification" ]; then
+        certification_rules
+        test $? -eq 0 && echo "CERTIFICATION" || echo "ERROR"
+    elif [ "$my_mode" == "service" ]; then
+        service_rules
+        test $? -eq 0 && echo "SERVICE" || echo "ERROR"
+    else
+        normal_rules
+        test $? -eq 0 && echo "OK" || echo "ERROR"
+    fi
+}
+
+stop() {
+    echo -n "Unconfiguring firewall: "
+    flush_rules
+    test $? -eq 0 && echo "OK" || echo "ERROR"
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart)
+        stop
+        start
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}" >&2
+        exit 1
+        ;;
+esac
