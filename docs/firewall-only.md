@@ -69,8 +69,16 @@ Validation rules are intentionally strict:
    image. Missing, duplicated, mixed, or structurally changed context aborts.
 6. Validate both slots before the first eMMC write.
 7. Construct the smallest sector-aligned payload containing the assignment.
-8. Save the complete rootfs reads and original sector payloads before writing.
+8. Save sampled evidence (or legacy complete rootfs reads) and the original
+   sector payloads before writing.
 9. Read every written sector back and require an exact byte-for-byte match.
+
+The Dev plugin improves step 4 by walking each ext4 filesystem through its
+superblock, group descriptors, inode tables, directory entries, and extent
+tree. It therefore samples only the blocks needed to resolve the live
+`/etc/init.d/S21firewall` inode. On the supplied images this is seven cached
+64 KiB reads (448 KiB) per slot rather than a 1 GB partition download. The
+legacy CLI retains its full-partition scan for compatibility.
 
 For the supplied images, both `S21firewall` files are 3,225 bytes, SHA-256
 `cb34db864fee2e6725fa09a293c60fff003b87348a16553419926ee7cc1a1cc8`, and

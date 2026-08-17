@@ -57,6 +57,14 @@ class FirewallImageMatch:
 
 
 @dataclass(frozen=True)
+class FirewallFileMatch:
+    state: str
+    file_size: int
+    file_sha256: str
+    assignment_offset: int
+
+
+@dataclass(frozen=True)
 class SectorPatch:
     start_sector: int
     sector_count: int
@@ -71,6 +79,55 @@ class SectorPatch:
     @property
     def after_sha256(self) -> str:
         return hashlib.sha256(self.after).hexdigest()
+
+
+def inspect_firewall_file(data: bytes) -> FirewallFileMatch:
+    """Validate a path-resolved S21firewall file against the full profile."""
+    if data == SIGNATURE_ORIGINAL:
+        state = "original"
+        digest = FILE_SHA256_ORIGINAL
+    elif data == SIGNATURE_PATCHED:
+        state = "patched"
+        digest = FILE_SHA256_PATCHED
+    else:
+        raise FirewallPatchError(
+            "path-resolved S21firewall does not match the known original or patched profile"
+        )
+    return FirewallFileMatch(
+        state=state,
+        file_size=len(data),
+        file_sha256=digest,
+        assignment_offset=ASSIGNMENT_OFFSET_IN_SIGNATURE,
+    )
+
+
+def build_sector_patch_from_reader(
+    match: FirewallFileMatch,
+    physical_assignment_offset: int,
+    read_at,
+    restore: bool = False,
+) -> SectorPatch:
+    """Build a minimal patch using a partition-relative byte reader."""
+    expected = ASSIGNMENT_PATCHED if match.state == "patched" else ASSIGNMENT_ORIGINAL
+    replacement = ASSIGNMENT_ORIGINAL if restore else ASSIGNMENT_PATCHED
+    start_byte = (physical_assignment_offset // SECTOR_SIZE) * SECTOR_SIZE
+    end_byte = physical_assignment_offset + len(expected)
+    end_byte = ((end_byte + SECTOR_SIZE - 1) // SECTOR_SIZE) * SECTOR_SIZE
+    before = read_at(start_byte, end_byte - start_byte)
+    if len(before) != end_byte - start_byte:
+        raise FirewallPatchError("could not read the complete patch sector range")
+    relative_offset = physical_assignment_offset - start_byte
+    if before[relative_offset:relative_offset + len(expected)] != expected:
+        raise FirewallPatchError("physical assignment bytes differ from the validated file")
+    after = bytearray(before)
+    after[relative_offset:relative_offset + len(expected)] = replacement
+    return SectorPatch(
+        start_sector=start_byte // SECTOR_SIZE,
+        sector_count=len(after) // SECTOR_SIZE,
+        before=before,
+        after=bytes(after),
+        assignment_offset=physical_assignment_offset,
+    )
 
 
 def _find_all(buffer: bytes, needle: bytes) -> Iterable[int]:
