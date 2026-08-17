@@ -13,6 +13,7 @@ from firewall_patch import (
     apply_patch_to_image,
     build_sector_patch,
     inspect_firewall_image,
+    preserve_recovery_payload,
 )
 
 
@@ -71,6 +72,36 @@ class FirewallPatchTests(unittest.TestCase):
         restored = apply_patch_to_image(path, restore=True)
         self.assertEqual(restored.state, "original")
         self.assertEqual(path.stat().st_size, original_size)
+
+    def test_recovery_payload_is_created_once_and_reused(self):
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        path = Path(temp_dir.name) / "rootfsA.firewall-sector.backup.bin"
+        payload = b"A" * SECTOR_SIZE
+
+        self.assertTrue(preserve_recovery_payload(path, payload))
+        self.assertFalse(preserve_recovery_payload(path, payload))
+        self.assertEqual(path.read_bytes(), payload)
+
+    def test_conflicting_recovery_payload_fails_without_overwrite(self):
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        path = Path(temp_dir.name) / "rootfsA.firewall-sector.backup.bin"
+        existing = b"A" * SECTOR_SIZE
+        path.write_bytes(existing)
+
+        with self.assertRaisesRegex(FirewallPatchError, "refusing to overwrite"):
+            preserve_recovery_payload(path, b"B" * SECTOR_SIZE)
+        self.assertEqual(path.read_bytes(), existing)
+
+    def test_recovery_payload_must_be_sector_aligned(self):
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        path = Path(temp_dir.name) / "bad.backup.bin"
+
+        with self.assertRaisesRegex(FirewallPatchError, "sector aligned"):
+            preserve_recovery_payload(path, b"not a sector")
+        self.assertFalse(path.exists())
 
 
 if __name__ == "__main__":

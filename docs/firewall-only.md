@@ -69,8 +69,9 @@ Validation rules are intentionally strict:
    image. Missing, duplicated, mixed, or structurally changed context aborts.
 6. Validate both slots before the first eMMC write.
 7. Construct the smallest sector-aligned payload containing the assignment.
-8. Save sampled evidence (or legacy complete rootfs reads) and the original
-   sector payloads before writing.
+8. Save sampled evidence (or legacy complete rootfs reads) and an immutable
+   original-sector recovery payload before writing. An existing recovery file
+   must match exactly or the operation aborts without overwriting it.
 9. Read every written sector back and require an exact byte-for-byte match.
 
 The Dev plugin improves step 4 by walking each ext4 filesystem through its

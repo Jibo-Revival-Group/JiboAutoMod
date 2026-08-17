@@ -8,6 +8,7 @@ of matching the common ``jibo-getmode`` assignment by itself.
 from __future__ import annotations
 
 import hashlib
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO, Iterable, Tuple
@@ -128,6 +129,30 @@ def build_sector_patch_from_reader(
         after=bytes(after),
         assignment_offset=physical_assignment_offset,
     )
+
+
+def preserve_recovery_payload(path: Path, original_payload: bytes) -> bool:
+    """Create an immutable original-sector recovery file.
+
+    Return ``True`` when the file is created and ``False`` when an identical
+    recovery file already exists. A conflicting file is never overwritten.
+    """
+    path = Path(path)
+    if not original_payload or len(original_payload) % SECTOR_SIZE:
+        raise FirewallPatchError("recovery payload must be non-empty and sector aligned")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with path.open("xb") as stream:
+            stream.write(original_payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except FileExistsError:
+        if path.read_bytes() != original_payload:
+            raise FirewallPatchError(
+                f"existing recovery payload differs; refusing to overwrite: {path}"
+            )
+        return False
+    return True
 
 
 def _find_all(buffer: bytes, needle: bytes) -> Iterable[int]:
