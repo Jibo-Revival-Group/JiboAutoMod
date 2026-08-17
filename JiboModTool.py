@@ -116,13 +116,13 @@ def run_script(script_path: str):
 
 def rut_menu():
     print("===[ ROBOT UNLOCKING TOOLS ]===")
-    print("If ou happen to want to contribute to this section make " + Color.BOLD + Color.UNDERLINE+ "sure you make a branch with the /exploits/ prefix" + Color.RESET)
+    print("If you happen to want to contribute to this section make " + Color.BOLD + Color.UNDERLINE+ "sure you make a branch with the /exploits/ prefix" + Color.RESET)
     print("Also pls RTFM over at ./Docs/AddExploit.md")
     
     from Exploits.ExploitDictionary import EXPLOITS
 
     exploits = [
-            Choice(title=exploit["name"], value=exploit, description=exploit["description"]) for exploit in EXPLOITS
+            Choice(title=f"{exploit['name']} - {exploit['description']}", value=exploit) for exploit in EXPLOITS
             ]
 
     selected_exploit = questionary.select("Choose an exploit", choices=exploits).ask()

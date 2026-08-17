@@ -5,3 +5,10 @@ __pycache__
 /__pycache__
 /dump
 /Platform
+.venv/pyvenv.cfg
+.venv/bin/python.exe
+.venv/bin/python3.11.exe
+.venv/bin/python3.exe
+.venv/bin/python3w.exe
+.venv/bin/pythonw.exe
+.vscode/settings.json
