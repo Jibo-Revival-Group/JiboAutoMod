@@ -1,0 +1,118 @@
+name: Jibo AutoMod CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-test-package:
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+        python-version:
+          - '3.8'
+          - '3.x'
+        include:
+          - python-version: '3.8'
+            package: false
+          - python-version: '3.x'
+            package: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libusb-1.0-0-dev gcc-arm-none-eabi libnewlib-arm-none-eabi
+
+      - name: Install macOS build dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install libusb pkgconf arm-none-eabi-gcc e2fsprogs
+
+      - name: Setup MSYS2 build dependencies
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git
+            make
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-libusb
+            mingw-w64-ucrt-x86_64-arm-none-eabi-gcc
+            mingw-w64-ucrt-x86_64-arm-none-eabi-newlib
+
+      - name: Run Python tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Compile Python sources
+        run: python -m compileall -q .
+
+      - name: Build Shofel native tools
+        if: runner.os != 'Windows'
+        run: make -C Exploits/Shofel
+
+      - name: Build Shofel native tools on Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make -C Exploits/Shofel
+
+      - name: Stage release files
+        if: matrix.package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path publish -Force | Out-Null
+          Copy-Item jibo_automod.py,JiboModTool.py,config.py,firewall_patch.py,requirements.txt -Destination publish
+          Copy-Item docs,Exploits,profiles -Destination publish -Recurse
+
+      - name: Package artifact
+        if: matrix.package
+        shell: pwsh
+        run: Compress-Archive -Path publish/* -DestinationPath JiboAutoMod-${{ runner.os }}-${{ github.sha }}.zip -Force
+
+      - name: Upload artifact for download
+        if: matrix.package
+        uses: actions/upload-artifact@v4
+        with:
+          name: JiboAutoMod-${{ runner.os }}-${{ github.sha }}
+          path: JiboAutoMod-${{ runner.os }}-${{ github.sha }}.zip
+          if-no-files-found: error
+
+      - name: Publish release download
+        if: matrix.package && startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: JiboAutoMod-${{ runner.os }}-${{ github.sha }}.zip
