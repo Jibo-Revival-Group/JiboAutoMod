@@ -39,7 +39,7 @@ def extract_var_partition(
 
         print("[ & ] Success! Partition extracted!")
 
-    except FileNotFound:
+    except FileNotFoundError:
         print(f"[ 󱄌 ] Error : dump wasnt found inside {image_path}, exiting...")
         sys.exit(1)
     except Exception as e:
@@ -211,7 +211,7 @@ def begin_dump(StartSector=0x0, EndSector=0x1D60000):
     except subprocess.CalledProcessError:
         print("[ 󱄌 ] Error : Shofel read operation was interrupted.")
         return False
-    except FileNotFound:
+    except FileNotFoundError:
         print(
             "[ 󱄌 ] Error : Shofel2 wasnt found in the Shofel directory, did you build?."
         )
@@ -229,7 +229,7 @@ def is_jibo_present():
         print("[   ] No device, Make sure youre connected to USB and in RCM mode!")
         return False
 
-    except (subprocess.CalledProcessError, FileNotFound):
+    except (subprocess.CalledProcessError, FileNotFoundError):
         print(
             f"[  ] Critical Error: Failed to run lsusb, check usbutils are installed, exiting..."
         )
@@ -261,7 +261,7 @@ def build_shofel():
     except subprocess.CalledProcessError:
         print("[  ] Critical Error: 'Make' failed ...")
         sys.exit(1)
-    except FileNotFound:
+    except FileNotFoundError:
         print("[  ] Critical Error: 'Make' not found...")
         sys.exit(1)
 
