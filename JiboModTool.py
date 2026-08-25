@@ -14,7 +14,7 @@ if importlib.util.find_spec("packaging") is None:
     print(
         "The required libraries are not installed. If you are using nixos, please run `nix develop` in the root directory and run the modding tool in the created shell again. This will install the required dependencies needed for the modding tool"
     )
-    raise os.error
+
 
 from packaging.requirements import Requirement
 
@@ -219,7 +219,7 @@ toolMode = questionary.select(
         "Jibo Package Manager [WIP]",
         "Jibo Server Tools",
         "Exit",
-    ]
+    ],
 ).ask()
 
 
