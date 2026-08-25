@@ -9,12 +9,91 @@ from contextlib import contextmanager
 from importlib.metadata import PackageNotFoundError, requires, version
 from pathlib import Path
 
-# Check if packaging library exists. It wasn't existing in my nixos so I wanted to add this check for the other nixos users
+# Check if packaging library exists. It wasn't existing in my nixos so I wanted to add this check for the other users
 if importlib.util.find_spec("packaging") is None:
-    print(
-        "The required libraries are not installed. If you are using nixos, please run `nix develop` in the root directory and run the modding tool in the created shell again. This will install the required dependencies needed for the modding tool"
-    )
+    # Get the os
+    if sys.platform.startswith("linux"):
+        distro_id = None
+        try:
+            with open("/etc/os-release") as f:
+                for line in f:
+                    if line.startswith("ID="):
+                        distro_id = line.strip().split("=", 1)[1].strip('"')
+                        break
+        except FileNotFoundError:
+            pass
 
+        if distro_id == "nixos":
+            # NixOS users need to run the flake.nix file
+            print(
+                "The required libraries are not installed. If you are using nixos, "
+                "please run `nix develop` in the root directory and run the modding tool "
+                "in the created shell again. This will install the required dependencies "
+                "needed for the modding tool"
+            )
+        elif distro_id in (
+            "ubuntu",
+            "debian",
+            "linuxmint",
+            "pop",
+            "elementary",
+            "zorin",
+        ):
+            # Debian -> apt
+            print("Attempting to install python3-packaging via apt...")
+            try:
+                subprocess.run(
+                    ["sudo", "apt", "install", "-y", "python3-packaging"], check=True
+                )
+            except subprocess.CalledProcessError:
+                print(
+                    "Automatic installation failed. Please install 'python3-packaging' manually."
+                )
+        elif distro_id in ("fedora", "centos", "rhel", "rocky", "almalinux"):
+            # Red Hat -> dnf
+            print("Attempting to install python3-packaging via dnf...")
+            try:
+                subprocess.run(
+                    ["sudo", "dnf", "install", "-y", "python3-packaging"], check=True
+                )
+            except subprocess.CalledProcessError:
+                print(
+                    "Automatic installation failed. Please install 'python3-packaging' manually."
+                )
+        elif distro_id in ("arch", "manjaro", "endeavouros"):
+            # Arch -> pacman
+            print("Attempting to install python-packaging via pacman...")
+            try:
+                subprocess.run(
+                    ["sudo", "pacman", "-S", "--noconfirm", "python-packaging"],
+                    check=True,
+                )
+            except subprocess.CalledProcessError:
+                print(
+                    "Automatic installation failed. Please install 'python-packaging' manually."
+                )
+        elif distro_id in ("opensuse", "suse"):
+            # openSUSE -> zypper
+            print("Attempting to install python3-packaging via zypper...")
+            try:
+                subprocess.run(
+                    ["sudo", "zypper", "install", "-y", "python3-packaging"], check=True
+                )
+            except subprocess.CalledProcessError:
+                print(
+                    "Automatic installation failed. Please install 'python3-packaging' manually."
+                )
+        else:
+            # Unknown linux distro
+            print(
+                f"Unsupported Linux distribution detected (ID: {distro_id}). "
+                "Please install the 'packaging' library manually using your package manager."
+            )
+    else:
+        print(
+            "The required 'packaging' library is not installed. "
+            "Please install it using pip or your system's package manager."
+        )
 
 from packaging.requirements import Requirement
 
