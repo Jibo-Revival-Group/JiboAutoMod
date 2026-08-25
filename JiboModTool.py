@@ -158,7 +158,115 @@ def check_py_dependencies(requirements_file="requirements.txt"):
         if missing_packages:
             print(f"[  ] Missing packages: {', '.join(missing_packages)}")
             print("[  ] Installing pkgs...")
+            # Check if 'pip' is installed
+            if importlib.util.find_spec("pip") is None:
+                if sys.platform.startswith("linux"):
+                    # Get the linux distro
+                    distro_id = None
+                    try:
+                        with open("/etc/os-release") as f:
+                            for line in f:
+                                if line.startswith("ID="):
+                                    distro_id = line.strip().split("=", 1)[1].strip('"')
+                                    break
+                    except FileNotFoundError:
+                        pass
 
+                    if distro_id == "nixos":
+                        # Special message for NixOS
+                        print(
+                            "pip is not installed. If you are using NixOS, "
+                            "please run `nix develop` in the root directory and run the modding tool "
+                            "in the created shell again. This will install the required dependencies "
+                        )
+                        # can't continiue without pip, sorry :(
+                        sys.exit(1)
+                    elif distro_id in (
+                        "ubuntu",
+                        "debian",
+                        "linuxmint",
+                        "pop",
+                        "elementary",
+                        "zorin",
+                    ):
+                        # Debian -> apt
+                        print("Attempting to install python3-pip via apt...")
+                        try:
+                            subprocess.run(
+                                ["sudo", "apt", "install", "-y", "python3-pip"],
+                                check=True,
+                            )
+                        except subprocess.CalledProcessError:
+                            print(
+                                "Automatic pip installation failed. Please install python3-pip manually."
+                            )
+                            sys.exit(1)
+                    elif distro_id in (
+                        "fedora",
+                        "centos",
+                        "rhel",
+                        "rocky",
+                        "almalinux",
+                    ):
+                        # Red Hat -> dnf
+                        print("Attempting to install python3-pip via dnf...")
+                        try:
+                            subprocess.run(
+                                ["sudo", "dnf", "install", "-y", "python3-pip"],
+                                check=True,
+                            )
+                        except subprocess.CalledProcessError:
+                            print(
+                                "Automatic pip installation failed. Please install python3-pip manually."
+                            )
+                            sys.exit(1)
+                    elif distro_id in ("arch", "manjaro", "endeavouros"):
+                        # Arch -> pacman
+                        print("Attempting to install python-pip via pacman...")
+                        try:
+                            subprocess.run(
+                                ["sudo", "pacman", "-S", "--noconfirm", "python-pip"],
+                                check=True,
+                            )
+                        except subprocess.CalledProcessError:
+                            print(
+                                "Automatic pip installation failed. Please install python-pip manually."
+                            )
+                            sys.exit(1)
+                    elif distro_id in ("opensuse", "suse"):
+                        # openSUSE -> zypper
+                        print("Attempting to install python3-pip via zypper...")
+                        try:
+                            subprocess.run(
+                                ["sudo", "zypper", "install", "-y", "python3-pip"],
+                                check=True,
+                            )
+                        except subprocess.CalledProcessError:
+                            print(
+                                "Automatic pip installation failed. Please install python3-pip manually."
+                            )
+                            sys.exit(1)
+                    else:
+                        # Unknown linux distro
+                        print(
+                            f"Unsupported Linux distribution detected (ID: {distro_id}). "
+                            "Please install pip manually using your package manager."
+                        )
+                        sys.exit(1)
+                else:
+                    print(
+                        "pip is not installed. "
+                        "Please install pip manually or use your system's package manager."
+                    )
+                    sys.exit(1)
+
+                # Check again because... two times a charm!
+                if importlib.util.find_spec("pip") is None:
+                    print("pip installation failed or still not available. Exiting.")
+                    # ...?
+                    sys.exit(1)
+
+            # Ok finally you can run it now :p
             cmd = [sys.executable, "-m", "pip", "install", "-r", requirements_file]
 
             # If on Linux/macOS and NOT in a virtual environment, append the bypass flag
