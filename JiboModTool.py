@@ -1,12 +1,25 @@
 import importlib
+import importlib.util
+import os
+import platform
 import subprocess
 import sys
-import os
-import importlib.util
-from pathlib import Path
-from packaging.requirements import Requirement
-from importlib.metadata import requires, version, PackageNotFoundError
+import time
 from contextlib import contextmanager
+from importlib.metadata import PackageNotFoundError, requires, version
+from pathlib import Path
+
+# Check if packaging library exists. It wasn't existing in my nixos so I wanted to add this check for the other nixos users
+if importlib.util.find_spec("packaging") is None:
+    print(
+        "The required libraries are not installed. If you are using nixos, please run `nix develop` in the root directory and run the modding tool in the created shell again. This will install the required dependencies needed for the modding tool"
+    )
+    raise os.error
+
+from packaging.requirements import Requirement
+
+import config
+
 
 @contextmanager
 def execution_environment(run_dir: str):
@@ -24,6 +37,7 @@ def execution_environment(run_dir: str):
         os.chdir(original_cwd)
         if abs_run_dir in sys.path:
             sys.path.remove(abs_run_dir)
+
 
 class Color:
     # Styles
@@ -44,17 +58,16 @@ class Color:
     WHITE = "\033[37m"
 
 
-
 def check_py_dependencies(requirements_file="requirements.txt"):
     try:
         missing_packages = []
-        
+
         with open(requirements_file, "r") as f:
             for line in f:
                 line = line.strip()
                 if not line or line.startswith("#"):
                     continue
-                
+
                 req = Requirement(line)
                 try:
                     installed_version = version(req.name)
@@ -64,38 +77,87 @@ def check_py_dependencies(requirements_file="requirements.txt"):
                     missing_packages.append(line)
 
         if missing_packages:
-            print(f"[  ] Missing packages: {', '.join(missing_packages)}")
-            print("[  ] Installing pkgs...")
-            
+            print(f"[  ] Missing packages: {', '.join(missing_packages)}")
+            print("[  ] Installing pkgs...")
+
             cmd = [sys.executable, "-m", "pip", "install", "-r", requirements_file]
-            
+
             # If on Linux/macOS and NOT in a virtual environment, append the bypass flag
             # (In Windows, or inside a venv, this isn't needed)
             in_venv = sys.prefix != sys.base_prefix
             if sys.platform != "win32" and not in_venv:
                 cmd.append("--break-system-packages")
-                
+
             subprocess.check_call(cmd)
-            
-            print("\n" + "="*50)
+
+            print("\n" + "=" * 50)
             print("[ 󱝎 ] All missing dependencies have been successfully installed!")
             print("[ 󱄌 ] Please RESTART the application now.")
-            print("="*50 + "\n")
+            print("=" * 50 + "\n")
             sys.exit(0)
-            
+
     except FileNotFoundError:
-        print(f"[  ] Error: '{requirements_file}' not found.")
+        print(f"[  ] Error: '{requirements_file}' not found.")
         sys.exit(1)
 
 
+def get_os():
+    os_name = platform.system()
+
+    if os_name == "Linux":
+        try:
+            info = platform.freedesktop_os_release()
+            distro = info.get("NAME", "Unknown Linux")
+            return ("Linux", str(distro))
+        except (AttributeError, KeyError, FileNotFoundError):
+            return ("Linux", "Unknown Linux")
+    elif os_name == "Windows":
+        return ("Windows", str(platform.release()))
+    else:
+        return os_name
 
 
+def load_platform_module(PLATFORM):
+    os_name, os_version = PLATFORM
 
+    os_dir = os.path.join("Platform", os_name)
+    if not os.path.isdir(os_dir):
+        print(
+            f"[  ] (@load_platform_module) Critical Error: Operating System: {os_name} is not supported yet"
+        )
+        print(
+            f"[  ] You can be the first one to contribute for {os_name} {os_version}! , Create a PR over at: "
+        )
+        print(
+            "[  ] https://github.com/Jibo-Revival-Group/JiboAutoMod or Let us know by making a issue there! "
+        )
+
+    specific_module_path = f"Platform.{os_name}.{os_version}"
+    try:
+        platform_module = importlib.import_module(specific_module_path)
+        print(f"[ 󰏖 ] Loaded denfinitions for {os_name} thats build for {os_version}!")
+        return platform_module
+    except ModuleNotFoundError as error:
+        if error.name == specific_module_path:
+            default_module_path = f"Platform.{os_name}.Default"
+            try:
+                platform_module = importlib.import_module(default_module_path)
+                print(
+                    f"[  ] Found generic denfinitios for {os_name}, should work for {os_version}"
+                )
+                return platform_module
+            except ModuleNotFoundError:
+                print(
+                    f"[  ] (@load_platform_module) Critical Error : Failed to find Default denfinitions for {os_name}, maybe re-pull source?"
+                )
+                sys.exit(1)
+        else:
+            raise error
 
 
 def run_script(script_path: str):
     path = Path(script_path).resolve()
-    # Automatically get the parent directory (e.g., /home/eva/Documents/JiboAutoMod/Exploits)
+    # Automatically get the parent directory
     run_dir = path.parent
     module_name = path.stem
 
@@ -109,34 +171,27 @@ def run_script(script_path: str):
     # because ShofelExploit.py calls load_platform_module() at top-level load time!
     with execution_environment(run_dir):
         spec.loader.exec_module(module)
-        
+
         # If ShofelExploit.py also has a main() function:
         if hasattr(module, "main"):
             return module.main()
+
 
 def rut_menu():
     print("===[ ROBOT UNLOCKING TOOLS ]===")
     print("If you happen to want to contribute to this section make " + Color.BOLD + Color.UNDERLINE+ "sure you make a branch with the /exploits/ prefix" + Color.RESET)
     print("Also pls RTFM over at ./Docs/AddExploit.md")
-    
+
     from Exploits.ExploitDictionary import EXPLOITS
 
     exploits = [
-            Choice(title=f"{exploit['name']} - {exploit['description']}", value=exploit) for exploit in EXPLOITS
-            ]
+        Choice(title=exploit["name"], value=exploit, description=exploit["description"])
+        for exploit in EXPLOITS
+    ]
 
     selected_exploit = questionary.select("Choose an exploit", choices=exploits).ask()
 
     run_script(selected_exploit["path"])
-
-    
-
-    
-
-
-
-    
-
 
 
 # ============================================== START <<<<<<<<<<<<<<<<<<<
@@ -149,11 +204,23 @@ check_py_dependencies()
 
 import questionary
 from questionary import Choice
-toolMode = questionary.select("Select Tool", ["Robot Unlocking Tools","Robot Manager [WIP]","Jibo Package Manager [WIP]","Jibo Server Tools","Exit"],qmark="",pointer="").ask()
 
-
+toolMode = questionary.select(
+    "Select Tool",
+    [
+        "Robot Unlocking Tools",
+        "Robot Manager [WIP]",
+        "Jibo Package Manager [WIP]",
+        "Jibo Server Tools",
+        "Exit",
+    ]
+).ask()
 
 
 match toolMode:
     case "Robot Unlocking Tools":
-       rut_menu() 
+        rut_menu()
+    case "Exit":
+        sys.exit(0)
+    case _:
+        print(f"'{toolMode}' is not implemented yet cooming soon!")
