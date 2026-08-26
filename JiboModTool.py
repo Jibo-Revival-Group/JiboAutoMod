@@ -158,6 +158,7 @@ def check_py_dependencies(requirements_file="requirements.txt"):
         if missing_packages:
             print(f"[  ] Missing packages: {', '.join(missing_packages)}")
             print("[  ] Installing pkgs...")
+
             # Check if 'pip' is installed
             if importlib.util.find_spec("pip") is None:
                 if sys.platform.startswith("linux"):
