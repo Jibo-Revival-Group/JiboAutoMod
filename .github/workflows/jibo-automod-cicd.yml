@@ -26,11 +26,8 @@ jobs:
           - macos-latest
           - windows-latest
         python-version:
-          - '3.8'
           - '3.x'
         include:
-          - python-version: '3.8'
-            package: false
           - python-version: '3.x'
             package: true
 
@@ -72,7 +69,7 @@ jobs:
             make
             gcc
             msys2-runtime-devel
-            libusb-devel
+            mingw-w64-x86_64-libusb
             pkg-config
             mingw-w64-ucrt-x86_64-arm-none-eabi-gcc
             mingw-w64-ucrt-x86_64-arm-none-eabi-newlib
