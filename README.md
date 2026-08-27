@@ -55,9 +55,9 @@ Full eMMC dumping is also supported on macOS:
 2. Install [MSYS2](https://www.msys2.org/) for build tools
 3. In an MSYS2 MinGW64 terminal, install the native build dependencies:
    ```bash
-   pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-make \
+   pacman -S --needed make mingw-w64-x86_64-gcc \
                       mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libusb \
-                      mingw-w64-x86_64-arm-none-eabi-gcc e2fsprogs
+                      e2fsprogs
    ```
 4. Double-click `jibo_automod.bat`
 
@@ -101,7 +101,7 @@ macOS support uses the same `jibo_automod.sh` launcher as Linux. The launcher ad
 ### Windows
 
 - Python 3.8+
-- MSYS2 with MinGW-w64 toolchain, `pkgconf`, `libusb`, and ARM GCC
+- MSYS2 with MinGW-w64 toolchain, `pkgconf`, and `libusb`
 - Zadig (for USB driver installation)
 - e2fsprogs (provides `debugfs`, used to edit `mode.json` inside the ext filesystem image without mounting)
 - ~20GB free disk space
@@ -369,7 +369,7 @@ If all retries fail:
 
 - Make sure ARM toolchain is installed
 - On macOS: `brew install libusb pkgconf arm-none-eabi-gcc e2fsprogs`
-- On Windows/MSYS2 MinGW64: `pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-make mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libusb mingw-w64-x86_64-arm-none-eabi-gcc e2fsprogs`
+- On Windows/MSYS2 MinGW64: `pacman -S --needed make mingw-w64-x86_64-gcc mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libusb e2fsprogs`
 - On Arch: `pacman -S arm-none-eabi-gcc arm-none-eabi-newlib`
 - On Ubuntu: `apt install gcc-arm-none-eabi libnewlib-arm-none-eabi`
 

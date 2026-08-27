@@ -70,8 +70,6 @@ jobs:
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-pkgconf
             mingw-w64-x86_64-libusb
-            mingw-w64-x86_64-arm-none-eabi-gcc
-            mingw-w64-x86_64-arm-none-eabi-newlib
 
       - name: Run Python tests
         run: python -m unittest discover -s tests -v
@@ -88,7 +86,7 @@ jobs:
         shell: msys2 {0}
         run: |
           pkg-config --cflags --libs libusb-1.0
-          make -C Exploits/Shofel
+          make -C Exploits/Shofel shofel2_t124
 
       - name: Stage release files
         if: matrix.package
