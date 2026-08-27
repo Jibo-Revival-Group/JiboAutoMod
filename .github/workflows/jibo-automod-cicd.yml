@@ -65,13 +65,15 @@ jobs:
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
         with:
-          msystem: UCRT64
+          msystem: MSYS
           update: true
           install: >-
             git
             make
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-libusb
+            gcc
+            msys2-runtime-devel
+            libusb-devel
+            pkg-config
             mingw-w64-ucrt-x86_64-arm-none-eabi-gcc
             mingw-w64-ucrt-x86_64-arm-none-eabi-newlib
 
