@@ -1,7 +1,7 @@
 import struct
 import unittest
 
-from ext4_path import EXT4_EXTENTS_FL, EXT4_FEATURE_INCOMPAT_EXTENTS, Ext4PathReader
+from ext4_path import EXT4_EXTENTS_FL, EXT4_FEATURE_INCOMPAT_EXTENTS, Ext4PathError, Ext4PathReader
 from firewall_patch import SIGNATURE_ORIGINAL, build_sector_patch_from_reader, inspect_firewall_file
 
 
@@ -68,6 +68,19 @@ class Ext4PathReaderTests(unittest.TestCase):
         self.assertEqual(physical, 13 * self.BLOCK + match.assignment_offset)
         self.assertEqual(len(patch.before), 512)
         self.assertNotEqual(patch.before, patch.after)
+
+    def test_resolve_reports_the_bad_path_component_and_inode_mode(self):
+        image = bytearray(self._image())
+        # Turn /etc's inode into a regular file while retaining the root entry.
+        inode_offset = 3 * self.BLOCK + (3 - 1) * 128
+        struct.pack_into("<H", image, inode_offset, 0x81A4)
+        reader = Ext4PathReader(lambda offset, length: image[offset:offset + length], len(image))
+
+        with self.assertRaisesRegex(
+            Ext4PathError,
+            "cannot resolve 'init.d': /etc inode 3 has non-directory mode 0x81a4",
+        ):
+            reader.resolve("/etc/init.d/S21firewall")
 
 
 if __name__ == "__main__":

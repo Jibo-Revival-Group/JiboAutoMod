@@ -186,11 +186,20 @@ class Ext4PathReader:
         if any(part in (".", "..") for part in parts):
             raise Ext4PathError("relative path components are forbidden")
         current = self.inode(2)
+        resolved = "/"
         for part in parts:
+            if current.mode & 0xF000 != 0x4000:
+                raise Ext4PathError(
+                    f"cannot resolve {part!r}: {resolved} inode {current.number} "
+                    f"has non-directory mode 0x{current.mode:04x}"
+                )
             matches = [number for name, number in self.directory_entries(current) if name == part]
             if len(matches) != 1:
-                raise Ext4PathError(f"expected one {part!r} entry, found {len(matches)}")
+                raise Ext4PathError(
+                    f"expected one {part!r} entry below {resolved}, found {len(matches)}"
+                )
             current = self.inode(matches[0])
+            resolved = resolved.rstrip("/") + "/" + part
         return current
 
     def read_file(self, inode: Inode, maximum_size: int = 1024 * 1024) -> bytes:
