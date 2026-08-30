@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - master
+      - Dev
     tags:
       - 'v*'
   pull_request:
@@ -93,8 +94,8 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path publish -Force | Out-Null
-          Copy-Item jibo_automod.py,JiboModTool.py,config.py,firewall_patch.py,requirements.txt -Destination publish
-          Copy-Item docs,Exploits,profiles -Destination publish -Recurse
+          Copy-Item JiboModTool.py,config.py,firewall_patch.py,ext4_path.py,diagnose_firewall_cache.py,requirements.txt,README.md -Destination publish
+          Copy-Item Docs,Exploits,profiles -Destination publish -Recurse
 
       - name: Package artifact
         if: matrix.package
