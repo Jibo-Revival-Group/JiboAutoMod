@@ -4,7 +4,15 @@ import unittest
 import zlib
 from pathlib import Path
 
-from jibo_automod import EMMC_SECTOR_SIZE, validate_gpt_integrity
+from Exploits.FirewallExploit import _validate_gpt
+from firewall_patch import SECTOR_SIZE
+
+
+EMMC_SECTOR_SIZE = SECTOR_SIZE
+
+
+def validate_gpt_integrity(path):
+    return _validate_gpt(Path(path))
 
 
 class GptValidationTests(unittest.TestCase):
