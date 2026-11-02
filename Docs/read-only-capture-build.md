@@ -92,3 +92,8 @@ constants. Real native hosts are invoked only with `--capabilities` in CI.
 CI artifacts retain fixture proofs and component hashes. They are build/test
 evidence, not an approved capture manifest, device test, restore proof or USB/
 driver certification. Fresh device admission and recovery review remain required.
+
+Evidence stores compiled components in `built-components/` and source copies in
+`reviewed-source/`. Dummy protocol files used by the USB fixture are isolated in
+`usb-fixture/`; they are not payloads for device use. Proof hashes identify each
+relative path, including the real built host and, on Linux/macOS, payload/bootstrap.
