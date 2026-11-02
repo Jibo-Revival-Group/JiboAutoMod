@@ -63,14 +63,14 @@ jobs:
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           update: true
           install: >-
             git
             make
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-pkgconf
-            mingw-w64-x86_64-libusb
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-libusb
 
       - name: Run Python tests
         run: python -m unittest discover -s tests -v
@@ -94,7 +94,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path publish -Force | Out-Null
-          Copy-Item JiboModTool.py,config.py,firewall_patch.py,ext4_path.py,diagnose_firewall_cache.py,requirements.txt,README.md -Destination publish
+          Copy-Item JiboModTool.py,conversion_plan.py,config.py,firewall_patch.py,ext4_path.py,diagnose_firewall_cache.py,requirements.txt,README.md -Destination publish
           Copy-Item Docs,Exploits,profiles -Destination publish -Recurse
 
       - name: Package artifact

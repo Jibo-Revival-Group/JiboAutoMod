@@ -59,15 +59,21 @@ Full eMMC dumping is also supported on macOS:
 
 1. Install [Python 3.8+](https://www.python.org/downloads/) (check "Add to PATH")
 2. Install [MSYS2](https://www.msys2.org/) for build tools
-3. In an MSYS2 MinGW64 terminal, install the native build dependencies:
+3. In an MSYS2 **UCRT64** terminal, install the native build dependencies:
    ```bash
-   pacman -S --needed make mingw-w64-x86_64-gcc \
-                      mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libusb \
+   pacman -S --needed make mingw-w64-ucrt-x86_64-gcc \
+                      mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-libusb \
                       e2fsprogs
    ```
 4. Double-click `jibo_automod.bat`
 
 Or use WSL (Windows Subsystem for Linux) and follow Linux instructions.
+
+Use UCRT64 consistently for the compiler, pkg-config and libusb. MSYS2 is
+[retiring MINGW64 package builds](https://www.msys2.org/news/#2026-10-24-mingw64-deprecation-update);
+its [current UCRT64 libusb package](https://packages.msys2.org/packages/mingw-w64-ucrt-x86_64-libusb)
+replaces the old package in these instructions and CI. This changes the native
+build environment; USB access and hardware conversion still need their own checks.
 
 ## Requirements
 
@@ -375,7 +381,7 @@ If all retries fail:
 
 - Make sure ARM toolchain is installed
 - On macOS: `brew install libusb pkgconf arm-none-eabi-gcc e2fsprogs`
-- On Windows/MSYS2 MinGW64: `pacman -S --needed make mingw-w64-x86_64-gcc mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libusb e2fsprogs`
+- On Windows/MSYS2 UCRT64: `pacman -S --needed make mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-libusb e2fsprogs`
 - On Arch: `pacman -S arm-none-eabi-gcc arm-none-eabi-newlib`
 - On Ubuntu: `apt install gcc-arm-none-eabi libnewlib-arm-none-eabi`
 
