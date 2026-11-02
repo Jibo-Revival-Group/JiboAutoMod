@@ -90,6 +90,11 @@ backup or an executable filesystem/sector change plan.
 
 ## Next integration stages
 
+The [offline primary GPT audit](primary-gpt-audit.md) can now inspect retained
+prefix evidence without importing device-control code. It checks a bounded
+partition-table profile, while native capture, device association, release/
+filesystem support and exact-change planning remain separate work.
+
 1. Connect real read-only host/device audit adapters, supported layout evidence
    and immutable recovery verification to this contract.
 2. Resolve a supported conversion profile into exact file/sector/certificate

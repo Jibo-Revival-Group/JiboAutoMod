@@ -94,8 +94,12 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path publish -Force | Out-Null
-          Copy-Item JiboModTool.py,conversion_plan.py,config.py,firewall_patch.py,ext4_path.py,diagnose_firewall_cache.py,requirements.txt,README.md -Destination publish
+          Copy-Item JiboModTool.py,conversion_plan.py,recovery_evidence.py,gpt_audit.py,gpt_layout.py,config.py,firewall_patch.py,ext4_path.py,diagnose_firewall_cache.py,requirements.txt,README.md -Destination publish
           Copy-Item Docs,Exploits,profiles -Destination publish -Recurse
+
+      - name: Verify staged offline entry points and dependencies
+        if: matrix.package
+        run: python -I -B tests/check_staged_offline.py --root publish
 
       - name: Package artifact
         if: matrix.package
