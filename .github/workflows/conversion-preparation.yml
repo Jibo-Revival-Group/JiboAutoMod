@@ -17,5 +17,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.9'
-      - name: Validate offline plan and export without device access
-        run: python -B -m unittest discover -s tests -p test_conversion_plan.py
+      - name: Validate preparation and retained recovery file checks without device access
+        run: |
+          python -B -m unittest discover -s tests -p test_conversion_plan.py
+          python -B -m unittest discover -s tests -p test_recovery_evidence.py

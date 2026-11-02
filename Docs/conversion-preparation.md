@@ -56,6 +56,11 @@ with invented placeholders to imply readiness. This tool cannot authenticate
 supplied evidence, determine its freshness, or check that it belongs to the
 robot; those remain explicit pre-apply gates.
 
+Use the separate [retained recovery file check](recovery-file-check.md) to read
+actual backup bytes against this inventory and export a path-free receipt. It
+verifies file hash/size at check time, while robot association, restore testing,
+fresh native audit and apply readiness remain separate gates.
+
 For isolated self-hosting, a target input can be:
 
 ```json

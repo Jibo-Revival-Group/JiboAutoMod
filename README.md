@@ -12,6 +12,10 @@ hosting/device/recovery plan without USB, network or device writes. It does not
 certify hardware support or complete conversion; the existing device writer
 remains separate.
 
+The portable [recovery file check](Docs/recovery-file-check.md) now verifies that
+retained backup bytes match the preparation inventory. Its receipt omits local
+paths and keeps robot association, restoration and apply readiness unverified.
+
 ## Current Dev entry points
 
 Start with the [host support matrix](Docs/host-support.md) for this branch.
