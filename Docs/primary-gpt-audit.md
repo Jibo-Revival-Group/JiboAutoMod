@@ -76,6 +76,10 @@ evidence, verified recovery bytes and exact file/sector/certificate preview befo
 confirmed apply and readback. The existing mixed read/write plugin is not imported
 as that adapter.
 
+The [dedicated storage-read-only build](read-only-capture-build.md) now removes
+write/erase handlers from a separate host/payload pair. It is a source/build
+prerequisite with stub checks, not hardware acceptance or a bounded capture adapter.
+
 CI runs the offline audit on Python 3.9 across Windows/macOS/Linux and separately
 tests the legacy writer/parser projection. Release staging includes all three
 offline entry points and their dependencies and invokes them from an unrelated

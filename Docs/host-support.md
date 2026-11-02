@@ -9,6 +9,7 @@ README reference are not shipped by the restructured Dev branch.
 | `conversion_plan.py` | Plan/export contracts in CI | Plan/export contracts in CI | Plan/export contracts in CI | Validates supplied preparation fields and exports a new plan; never applies it |
 | `recovery_evidence.py` | File-check contracts in CI | File-check contracts in CI | File-check contracts in CI | Streams retained regular backup files and compares supplied hash/size; does not prove robot association or restoration |
 | `gpt_audit.py` | Retained GPT-prefix tests in CI | Retained GPT-prefix tests in CI | Retained GPT-prefix tests in CI | Validates a narrow primary-table profile; does not capture hardware or enable conversion |
+| Dedicated `readonly` build | Host/policy tests; no ARM payload build in Windows job | Host/payload build and policy tests | Host/payload build and policy tests | Compile-time write exclusion and stub transport checks; no hardware admission |
 | `Exploits/Shofel` native compilation | UCRT64 loader build in CI | Toolchain build in CI | Toolchain build in CI | Compiles the selected native targets; does not prove USB access or device writes |
 | `JiboModTool.py` interactive device menu | Adapter missing: `Exploits/Platform/Windows` is an empty placeholder file | Darwin adapter missing | Generic Linux adapter exists | Developer integration only; not a complete cross-OS conversion release |
 
@@ -43,6 +44,10 @@ need a dedicated hardware test. Installing a build dependency does not install
 a robot driver or change a robot.
 
 ## Completing the easy-button flow
+
+The [dedicated capture build](read-only-capture-build.md) supplies a narrower
+host/payload pair for a future native audit adapter. Provenance, full-operation
+deadlines, USB/driver admission, device association and recovery remain separate.
 
 The next implementation is a shared audit/plan orchestrator with explicit
 OS adapters, leaving the proven bounded device writer intact. Add read-only
