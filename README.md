@@ -2,7 +2,27 @@
 
 **Automatically enable developer mode on Jibo robots**
 
-This tool automates the process of modding a Jibo robot to enable SSH access and developer mode. It works on **Linux**, **macOS**, and **Windows**.
+This repository contains Jibo access, recovery and conversion tooling. OS support
+depends on the entry point; native compilation, offline planning and physical
+device conversion have different acceptance requirements.
+
+For the new offline conversion planning contract on Windows, macOS and Linux,
+see [conversion preparation](Docs/conversion-preparation.md). It exports a
+hosting/device/recovery plan without USB, network or device writes. It does not
+certify hardware support or complete conversion; the existing device writer
+remains separate.
+
+## Current Dev entry points
+
+Start with the [host support matrix](Docs/host-support.md) for this branch.
+`conversion_plan.py` is the independent, offline plan/export entry point for
+Windows, macOS and Linux. `JiboModTool.py` is the restructured interactive
+developer menu and requires Python 3.10 or newer; its device adapters are
+incomplete. The old `jibo_automod.py`, `.sh` and `.bat` launchers described below
+are not present in this Dev checkout. Do not copy those commands into this branch.
+
+The remaining standalone-tool reference describes the older main implementation;
+it is retained for users of that version, not a Dev hardware-support claim.
 
 ## ⚠️ Warning
 
@@ -12,7 +32,7 @@ This tool automates the process of modding a Jibo robot to enable SSH access and
 - **Don't disconnect during write operations** - this could brick your Jibo
 - **Calibration data is unique** - your backup contains data specific to YOUR Jibo
 
-## Quick Start
+## Historical standalone quick start (older main)
 
 ### Linux
 
@@ -53,15 +73,21 @@ Full eMMC dumping is also supported on macOS:
 
 1. Install [Python 3.8+](https://www.python.org/downloads/) (check "Add to PATH")
 2. Install [MSYS2](https://www.msys2.org/) for build tools
-3. In an MSYS2 MinGW64 terminal, install the native build dependencies:
+3. In an MSYS2 **UCRT64** terminal, install the native build dependencies:
    ```bash
-   pacman -S --needed make mingw-w64-x86_64-gcc \
-                      mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libusb \
+   pacman -S --needed make mingw-w64-ucrt-x86_64-gcc \
+                      mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-libusb \
                       e2fsprogs
    ```
 4. Double-click `jibo_automod.bat`
 
 Or use WSL (Windows Subsystem for Linux) and follow Linux instructions.
+
+Use UCRT64 consistently for the compiler, pkg-config and libusb. MSYS2 is
+[retiring MINGW64 package builds](https://www.msys2.org/news/#2026-10-24-mingw64-deprecation-update);
+its [current UCRT64 libusb package](https://packages.msys2.org/packages/mingw-w64-ucrt-x86_64-libusb)
+replaces the old package in these instructions and CI. This changes the native
+build environment; USB access and hardware conversion still need their own checks.
 
 ## Requirements
 
@@ -369,7 +395,7 @@ If all retries fail:
 
 - Make sure ARM toolchain is installed
 - On macOS: `brew install libusb pkgconf arm-none-eabi-gcc e2fsprogs`
-- On Windows/MSYS2 MinGW64: `pacman -S --needed make mingw-w64-x86_64-gcc mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libusb e2fsprogs`
+- On Windows/MSYS2 UCRT64: `pacman -S --needed make mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-libusb e2fsprogs`
 - On Arch: `pacman -S arm-none-eabi-gcc arm-none-eabi-newlib`
 - On Ubuntu: `apt install gcc-arm-none-eabi libnewlib-arm-none-eabi`
 

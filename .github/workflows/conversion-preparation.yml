@@ -1,0 +1,20 @@
+name: Conversion preparation contracts
+on:
+  push:
+    branches: [Dev]
+  pull_request:
+    branches: [Dev]
+jobs:
+  plan-export:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - name: Validate offline plan and export without device access
+        run: python -B -m unittest discover -s tests -p test_conversion_plan.py
