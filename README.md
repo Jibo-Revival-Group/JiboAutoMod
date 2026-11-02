@@ -2,13 +2,27 @@
 
 **Automatically enable developer mode on Jibo robots**
 
-This tool automates the process of modding a Jibo robot to enable SSH access and developer mode. It works on **Linux**, **macOS**, and **Windows**.
+This repository contains Jibo access, recovery and conversion tooling. OS support
+depends on the entry point; native compilation, offline planning and physical
+device conversion have different acceptance requirements.
 
 For the new offline conversion planning contract on Windows, macOS and Linux,
 see [conversion preparation](Docs/conversion-preparation.md). It exports a
 hosting/device/recovery plan without USB, network or device writes. It does not
 certify hardware support or complete conversion; the existing device writer
 remains separate.
+
+## Current Dev entry points
+
+Start with the [host support matrix](Docs/host-support.md) for this branch.
+`conversion_plan.py` is the independent, offline plan/export entry point for
+Windows, macOS and Linux. `JiboModTool.py` is the restructured interactive
+developer menu and requires Python 3.10 or newer; its device adapters are
+incomplete. The old `jibo_automod.py`, `.sh` and `.bat` launchers described below
+are not present in this Dev checkout. Do not copy those commands into this branch.
+
+The remaining standalone-tool reference describes the older main implementation;
+it is retained for users of that version, not a Dev hardware-support claim.
 
 ## ⚠️ Warning
 
@@ -18,7 +32,7 @@ remains separate.
 - **Don't disconnect during write operations** - this could brick your Jibo
 - **Calibration data is unique** - your backup contains data specific to YOUR Jibo
 
-## Quick Start
+## Historical standalone quick start (older main)
 
 ### Linux
 

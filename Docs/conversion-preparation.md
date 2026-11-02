@@ -9,6 +9,9 @@ unchanged.
 
 ## Windows, macOS and Linux
 
+See the [Dev host support matrix](host-support.md) to distinguish this portable
+planner from the unfinished interactive device adapters and older launchers.
+
 Use Python 3.9 or newer from the repository root. This command has no external
 Python dependencies and does not import the exploit, USB or GUI code:
 
