@@ -16,6 +16,10 @@ The portable [recovery file check](Docs/recovery-file-check.md) now verifies tha
 retained backup bytes match the preparation inventory. Its receipt omits local
 paths and keeps robot association, restoration and apply readiness unverified.
 
+The [primary GPT audit](Docs/primary-gpt-audit.md) checks retained partition-table
+evidence without device access. It reports geometry/profile limits explicitly;
+native capture and exact-change conversion preview remain to be integrated.
+
 ## Current Dev entry points
 
 Start with the [host support matrix](Docs/host-support.md) for this branch.

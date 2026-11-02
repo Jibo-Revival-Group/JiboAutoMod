@@ -21,3 +21,4 @@ jobs:
         run: |
           python -B -m unittest discover -s tests -p test_conversion_plan.py
           python -B -m unittest discover -s tests -p test_recovery_evidence.py
+          python -B -m unittest discover -s tests -p test_gpt_audit.py
