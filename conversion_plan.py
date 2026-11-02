@@ -3,6 +3,7 @@
 import argparse
 from datetime import datetime, timezone
 import hashlib
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -91,8 +92,19 @@ def target(value):
     except ValueError:
         raise ValueError('target_origin') from None
     require(value['mode'] == 'isolated' or parsed.scheme == 'https', 'provider_https_required')
-    require(parsed.hostname.lower() not in ('localhost', '127.0.0.1', '::1', '0.0.0.0', '::'),
-            'robot_reachable_origin_required')
+    hostname = parsed.hostname.lower().rstrip('.')
+    require(hostname != 'localhost' and not hostname.endswith('.localhost') and
+            not parsed.netloc.endswith(':'), 'robot_reachable_origin_required')
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        # Refuse ambiguous integer/short IPv4 spellings which some clients map to loopback.
+        require(not re.fullmatch(r'[0-9.]+', hostname), 'target_address_not_canonical')
+    else:
+        mapped = getattr(address, 'ipv4_mapped', None)
+        require(not address.is_loopback and not address.is_unspecified and
+                not (mapped and (mapped.is_loopback or mapped.is_unspecified)),
+                'robot_reachable_origin_required')
     return value
 
 

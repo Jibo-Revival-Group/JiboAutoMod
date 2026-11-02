@@ -44,7 +44,10 @@ class Preparation(unittest.TestCase):
     def test_rejects_credentials_non_origin_urls_and_loopback(self):
         for origin in ('https://user:secret@example.com', 'https://example.com?token=secret',
                        'https://example.com/#x', 'https://example.com/path', 'ftp://example.com',
-                       'http://localhost', 'http://[::1]', 'http://example.com:99999',
+                       'http://localhost', 'http://localhost.', 'http://robot.localhost',
+                       'http://127.0.0.2', 'http://127.1', 'http://2130706433',
+                       'http://[::1]', 'http://[::ffff:127.0.0.1]', 'http://example.com:',
+                       'http://example.com:99999',
                        'https://example.com/%2e%2e', 'https://example.com\\foreign'):
             with self.subTest(origin=origin), self.assertRaises(ValueError):
                 P.plan(self.audit, {**self.target, 'apiOrigin': origin})
