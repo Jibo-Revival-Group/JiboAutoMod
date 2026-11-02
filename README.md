@@ -4,6 +4,12 @@
 
 This tool automates the process of modding a Jibo robot to enable SSH access and developer mode. It works on **Linux**, **macOS**, and **Windows**.
 
+For the new offline conversion planning contract on Windows, macOS and Linux,
+see [conversion preparation](Docs/conversion-preparation.md). It exports a
+hosting/device/recovery plan without USB, network or device writes. It does not
+certify hardware support or complete conversion; the existing device writer
+remains separate.
+
 ## ⚠️ Warning
 
 **USE AT YOUR OWN RISK!** This tool modifies your Jibo's internal storage. While the process is generally safe:
