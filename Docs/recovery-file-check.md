@@ -69,6 +69,8 @@ Windows path and handle timestamp queries can differ, so timestamp stability is
 checked on the open handle; path comparisons check identity and size. Filesystem
 mount backing is outside the checker: use retained local copies rather than
 network mounts. No direct network request or remote URL is used.
+Use the physical directory spelling if an ancestor is a system alias (for
+example, macOS `/private/var` rather than its `/var` symlink).
 
 The receipt contains the canonical inventory hash, supplied audit/device hashes,
 checker/parser code hashes, UTC check time and each checked kind/hash/size. Paths,

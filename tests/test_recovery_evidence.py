@@ -17,7 +17,9 @@ import recovery_evidence as R
 class RecoveryFiles(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory(); self.addCleanup(self.directory.cleanup)
-        self.root = Path(self.directory.name)
+        # macOS's default /var temp prefix is itself a symlink. Test real paths
+        # so ordinary artifact checks do not implicitly traverse that alias.
+        self.root = Path(self.directory.name).resolve()
         self.audit = dict(schema='openjibo.conversion-inventory.v1', deviceFingerprintSha256='a'*64,
                           releaseFamily='v2', observedAtUtc='2026-11-02T00:00:00Z', auditEvidenceSha256='b'*64, backups=[])
         self.files = dict(schema='openjibo.recovery-files.v1', files=[])
@@ -100,6 +102,11 @@ class RecoveryFiles(unittest.TestCase):
             self.files['files'][0]['path'] = value
             with self.subTest(value=value), self.assertRaises(ValueError): self.run_check()
 
+    def test_windows_reparse_attributes_are_refused(self):
+        from types import SimpleNamespace
+        with patch.object(Path, 'lstat', return_value=SimpleNamespace(st_mode=stat_mode(), st_file_attributes=1024)):
+            with self.assertRaises(ValueError): R.ordinary_path(self.root/'calibration')
+
     def test_cli_new_output_only_sanitized_failure_and_no_partial_receipt(self):
         inventory, files, output = [self.root/name for name in ('inventory.json', 'files.json', 'receipt.json')]
         inventory.write_text(json.dumps(self.audit)); files.write_text(json.dumps(self.files))
@@ -113,6 +120,11 @@ class RecoveryFiles(unittest.TestCase):
         bad = subprocess.run(command, capture_output=True, text=True)
         self.assertEqual(2, bad.returncode); self.assertFalse(output.exists())
         self.assertNotIn(self.directory.name, bad.stderr); self.assertNotIn('Traceback', bad.stderr)
+
+
+def stat_mode():
+    import stat
+    return stat.S_IFREG | 0o600
 
 
 if __name__ == '__main__': unittest.main()
