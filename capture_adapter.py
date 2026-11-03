@@ -56,14 +56,14 @@ def pinned_json(path, expected):
                       parse_constant=lambda _: require(False))
 
 
-def validate(manifest, plan, manifest_pin, plan_pin):
+def validate_profile(manifest, plan, manifest_pin, plan_pin, system, arch):
     require(type(manifest_pin) is str and P.HASH.fullmatch(manifest_pin) and type(plan_pin) is str and P.HASH.fullmatch(plan_pin))
     P.exact(manifest, ('schema','sourceRevision','os','architecture','protocol','files'), 'manifest_fields')
     P.exact(plan, ('schema','sourceRevision','bundleSha256','kind','startSector','sectorCount','timeoutSeconds'), 'plan_fields')
     require(manifest['schema'] == 'openjibo.readonly-capture-bundle.v1' and plan['schema'] == 'openjibo.readonly-capture-plan.v1')
     require(type(manifest['sourceRevision']) is str and re.fullmatch(r'[0-9a-f]{40}', manifest['sourceRevision']))
     require(plan['sourceRevision'] == manifest['sourceRevision'] and plan['bundleSha256'] == manifest_pin)
-    system, arch = context()
+    require(system in ('windows','linux','macos') and arch in ('x86_64','arm64'))
     require(manifest['os'] == system and manifest['architecture'] == arch and manifest['protocol'] == PROTOCOL)
     require(type(plan['timeoutSeconds']) is int and 1 <= plan['timeoutSeconds'] <= 60)
     require(type(plan['startSector']) is int and plan['startSector'] == 0 and type(plan['sectorCount']) is int)
@@ -95,6 +95,10 @@ def validate(manifest, plan, manifest_pin, plan_pin):
     require(roles == set(fixed))
     return dict(manifest=manifest, plan=plan, manifestSha256=manifest_pin, planSha256=plan_pin,
                 host=fixed['host'], expectedBytes=plan['sectorCount']*512)
+
+
+def validate(manifest, plan, manifest_pin, plan_pin):
+    return validate_profile(manifest, plan, manifest_pin, plan_pin, *context())
 
 
 def check_budget(deadline, cancellation):

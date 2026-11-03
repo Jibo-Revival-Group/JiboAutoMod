@@ -13,6 +13,7 @@ def main():
     parser.add_argument('--compiler', required=True)
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--real-host', type=Path)
+    parser.add_argument('--source-revision')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     native = root/'Exploits/Shofel'
@@ -108,7 +109,7 @@ def main():
         components.extend([payload,native/'intermezzo.bin'])
     for component in components:
         copied = built/component.name; shutil.copyfile(component,copied); files.append(copied)
-    proof = dict(scope='USB link stubs and compiler/build evidence only; no hardware', scenarios=results,
+    proof = dict(sourceRevision=args.source_revision,scope='USB link stubs and compiler/build evidence only; no hardware', scenarios=results,
                  policyRangeCases=10000, legacyOpcodesRefused=256, capabilities=capabilities,readOnlyPayloadBuilt=os.name != 'nt',
                  files=[dict(file=p.relative_to(output).as_posix(),sha256=hashlib.sha256(p.read_bytes()).hexdigest()) for p in files])
     (output/'proof.json').write_text(json.dumps(proof,indent=2)+'\n', encoding='utf-8')

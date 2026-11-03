@@ -34,6 +34,8 @@ traversal, reserved device names or scripts. Each file is at most 16 MiB; total
 size is at most 64 MiB. Payload/bootstrap have tighter 128 KiB/256-byte limits.
 Every listed file is hash/size checked; missing assets never trigger installation
 or a general-purpose fallback. Windows host-only CI output is not a full bundle.
+The separate [candidate preparation tool](capture-candidate.md) can join a static
+Windows runtime export to an actual ARM build from the same source revision.
 
 Listed runtime files are pinned, but PE/ELF/Mach-O imports are not inspected and
 complete dependency closure is not established automatically. The OS loader/

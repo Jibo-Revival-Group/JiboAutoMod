@@ -10,9 +10,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', required=True, type=Path)
     root = parser.parse_args().root.absolute()
-    scripts = ('conversion_plan.py', 'recovery_evidence.py', 'gpt_audit.py', 'capture_adapter.py')
+    scripts = ('conversion_plan.py', 'recovery_evidence.py', 'gpt_audit.py', 'capture_adapter.py', 'capture_bundle.py', 'capture_audit.py')
     required = (*scripts, 'gpt_layout.py', 'capture_process.py', 'Docs/conversion-preparation.md',
-                'Docs/recovery-file-check.md', 'Docs/primary-gpt-audit.md', 'Docs/bounded-capture-adapter.md')
+                'pe_imports.py', 'Docs/recovery-file-check.md', 'Docs/primary-gpt-audit.md', 'Docs/bounded-capture-adapter.md', 'Docs/capture-candidate.md')
     if not all((root/name).is_file() for name in required):
         raise SystemExit('Staged offline package is incomplete.')
     with tempfile.TemporaryDirectory() as other:

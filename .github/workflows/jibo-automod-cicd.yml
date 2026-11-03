@@ -96,10 +96,27 @@ jobs:
           $compiler = if ($IsWindows) { $env:OPENJIBO_READONLY_CC } else { (Get-Command cc -ErrorAction Stop).Source }
           if ($IsWindows) { $env:PATH = (Split-Path -Parent $compiler) + ';' + $env:PATH }
           $hostName = if ($IsWindows) { 'shofel2_t124_readonly.exe' } else { 'shofel2_t124_readonly' }
-          python -I -B tests/check_readonly_native.py --compiler $compiler --output "$env:RUNNER_TEMP/readonly-native-contract" --real-host "Exploits/Shofel/$hostName"
+          python -I -B tests/check_readonly_native.py --compiler $compiler --output "$env:RUNNER_TEMP/readonly-native-contract" --real-host "Exploits/Shofel/$hostName" --source-revision '${{ github.sha }}'
           if ($LASTEXITCODE -ne 0) { throw 'Read-only native contract failed.' }
           python -I -B tests/check_capture_adapter_native.py --fixture "$env:RUNNER_TEMP/readonly-native-contract"
           if ($LASTEXITCODE -ne 0) { throw 'Bounded capture adapter native integration failed.' }
+
+      - name: Export Windows static runtime components without executing them
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $runtime = Split-Path -Parent $env:OPENJIBO_READONLY_CC
+          $licenses = Join-Path (Split-Path -Parent $runtime) 'share/licenses'
+          python -I -B capture_bundle.py export-windows --host Exploits/Shofel/shofel2_t124_readonly.exe --runtime $runtime --licenses $licenses --source "$env:RUNNER_TEMP/readonly-native-contract/reviewed-source" --source-revision '${{ github.sha }}' --output "$env:RUNNER_TEMP/windows-static-components"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows static dependency export failed.' }
+
+      - name: Upload Windows static runtime component review
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: CaptureComponents-Windows-${{ github.sha }}
+          path: ${{ runner.temp }}/windows-static-components
+          if-no-files-found: error
 
       - name: Upload read-only compiler and fixture evidence
         uses: actions/upload-artifact@v4
@@ -113,7 +130,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path publish -Force | Out-Null
-          Copy-Item JiboModTool.py,conversion_plan.py,recovery_evidence.py,gpt_audit.py,gpt_layout.py,capture_adapter.py,capture_process.py,config.py,firewall_patch.py,ext4_path.py,diagnose_firewall_cache.py,requirements.txt,README.md -Destination publish
+          Copy-Item JiboModTool.py,conversion_plan.py,recovery_evidence.py,gpt_audit.py,gpt_layout.py,capture_adapter.py,capture_process.py,capture_bundle.py,pe_imports.py,capture_audit.py,config.py,firewall_patch.py,ext4_path.py,diagnose_firewall_cache.py,requirements.txt,README.md -Destination publish
           Copy-Item Docs,Exploits,profiles -Destination publish -Recurse
 
       - name: Verify staged offline entry points and dependencies
