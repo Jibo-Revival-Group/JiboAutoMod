@@ -1,5 +1,11 @@
 # Jibo Auto-Mod Tool
 
+The portable [storage file evidence reader](Docs/storage-file-evidence.md) checks
+Jetstream configuration bytes and credential region inside a pinned offline
+backup. It exports hashes and locations without credential contents. Explicit
+partition selection, real mount/release evidence and conversion review integration
+remain separate; it performs no device operation.
+
 **Automatically enable developer mode on Jibo robots**
 
 This repository contains Jibo access, recovery and conversion tooling. OS support
