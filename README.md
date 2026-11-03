@@ -43,6 +43,11 @@ requirements. It preserves credentials and certificate files and exports a
 reviewable semantic file delta. Native/notification/SSM routing and the complete
 conversion plan remain separate work.
 
+The [conversion review builder](Docs/conversion-review-bundle.md) now recomputes
+these components together, checks GPT/rootfs bytes against a retained full-storage
+backup, and exports one local review page with file hashes and explicit coverage
+gaps. It does not apply changes or establish physical device identity.
+
 ## Current Dev entry points
 
 Start with the [host support matrix](Docs/host-support.md) for this branch.
