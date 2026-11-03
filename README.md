@@ -24,6 +24,9 @@ The [bounded capture adapter](Docs/bounded-capture-adapter.md) now inspects pinn
 bundles without execution, or explicitly supervises the dedicated read-only host
 with deadlines and evidence receipts. Tests use synthetic processes/USB stubs;
 reviewed real bundles, device windows and hardware/recovery acceptance remain.
+Its [process cleanup](Docs/capture-process-cleanup.md) preserves the primary
+failure and reports cleanup failures separately; a successful process exit with
+failed cleanup cannot admit capture data.
 
 [Capture candidate preparation](Docs/capture-candidate.md) joins a Windows static
 DLL export and an actual ARM payload from the same CI revision into a pinned,

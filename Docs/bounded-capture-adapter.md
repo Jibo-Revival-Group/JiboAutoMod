@@ -95,6 +95,9 @@ suspended, enter a kill-on-close job, then resume. Cancellation/timeout triggers
 termination, with up to two seconds of process cleanup and short drain grace.
 Kernel/filesystem waits are not forcibly bounded; this is not hard realtime or
 a sandbox for untrusted pinned code. Artifact review remains necessary.
+The [cleanup reliability notes](capture-process-cleanup.md) describe independent
+termination/wait/pipe checks, preservation of the first failure, sanitized phase
+metadata and refusal of otherwise successful captures when cleanup fails.
 
 Completion requires exit zero, EOF within diagnostic limits, exact-size regular
 data, stable hashes and unchanged components. A new root `capture.bin` and

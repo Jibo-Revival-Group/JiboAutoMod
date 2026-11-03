@@ -59,7 +59,9 @@ class WindowsJob:
 
     def close(self):
         if self.handle:
-            self.api.CloseHandle(self.handle); self.handle = None
+            if not self.api.CloseHandle(self.handle): return False
+            self.handle = None
+        return True
 
     def resume(self,process):
         if not self.handle: return
@@ -87,6 +89,7 @@ class Drain:
     def __init__(self, stream, limit, retain):
         self.stream = stream; self.limit = limit; self.retain = retain
         self.bytes = bytearray(); self.count = 0; self.sha = hashlib.sha256()
+        self.lock = threading.Lock()
         self.exceeded = threading.Event(); self.finished = threading.Event()
         self.error = False
         self.thread = threading.Thread(target=self.read, daemon=True)
@@ -97,79 +100,142 @@ class Drain:
             while True:
                 block = self.stream.read(4096)
                 if not block: break
-                remaining = max(0, self.limit-self.count)
-                self.sha.update(block[:remaining])
-                if self.retain: self.bytes.extend(block[:remaining])
-                self.count = min(self.limit+1, self.count+len(block))
-                if self.count > self.limit: self.exceeded.set()
+                with self.lock:
+                    remaining = max(0, self.limit-self.count)
+                    self.sha.update(block[:remaining])
+                    if self.retain: self.bytes.extend(block[:remaining])
+                    self.count = min(self.limit+1, self.count+len(block))
+                    if self.count > self.limit: self.exceeded.set()
         except (OSError, ValueError): self.error = True
         finally:
-            self.stream.close(); self.finished.set()
+            try: self.stream.close()
+            except (OSError, ValueError): self.error = True
+            finally: self.finished.set()
 
     def summary(self):
-        return dict(observedBytes=self.count, limitExceeded=self.exceeded.is_set(),
-                    boundedSha256=self.sha.hexdigest(), rawDiagnosticsRetained=False)
+        with self.lock:
+            return dict(observedBytes=self.count, limitExceeded=self.exceeded.is_set(),
+                        boundedSha256=self.sha.hexdigest(), rawDiagnosticsRetained=False)
+
+
+def failure_details(error,phase):
+    number=getattr(error,'errno',None)
+    kind='timeout' if isinstance(error,subprocess.TimeoutExpired) else 'interrupted' if isinstance(error,KeyboardInterrupt) else \
+         'os-error' if isinstance(error,OSError) else 'value-error' if isinstance(error,ValueError) else 'runtime-error' if isinstance(error,RuntimeError) else 'other-error'
+    return dict(phase=phase,errorType=kind,errorNumber=number if type(number) is int and -4096<=number<=4096 else None)
+
+
+def cleanup(process,job,stdout,stderr):
+    """Attempt every owned cleanup step; never replace the primary failure."""
+    result=dict(scope='windows-job' if os.name=='nt' else 'posix-process-group',groupTerminationRequested=False,
+                parentTerminationRequested=False,parentReaped=False,parentExitCode=None,drainsFinished=False,
+                interrupted=False,errors=[],failures=[])
+    def attempt(code,operation):
+        try: return True,operation()
+        except (Exception,KeyboardInterrupt) as error:
+            result['errors'].append(code)
+            result['failures'].append(failure_details(error,code))
+            if isinstance(error,KeyboardInterrupt): result['interrupted']=True
+            return False,None
+    if job is not None:
+        closed,value=attempt('job-close-failed',job.close)
+        if closed and value is False:
+            result['errors'].append('job-close-failed')
+            result['failures'].append(dict(phase='job-close-failed',errorType='not-confirmed',errorNumber=None))
+        if os.name=='nt' and process is not None: result['groupTerminationRequested']=True
+    if process is not None:
+        if os.name!='nt':
+            result['groupTerminationRequested']=True
+            def terminate_group():
+                try: os.killpg(process.pid,signal.SIGKILL)
+                except ProcessLookupError: pass
+            attempt('group-termination-failed',terminate_group)
+        polled,code=attempt('parent-poll-failed',process.poll)
+        if not polled or code is None:
+            result['parentTerminationRequested']=True
+            def terminate_parent():
+                try: process.kill()
+                except ProcessLookupError: pass
+            attempt('parent-termination-failed',terminate_parent)
+        reaped,code=attempt('parent-reap-failed',lambda:process.wait(timeout=2))
+        result['parentReaped']=reaped and type(code) is int
+        result['parentExitCode']=code if result['parentReaped'] else None
+        if reaped and not result['parentReaped']: result['errors'].append('parent-reap-unconfirmed')
+    finished=[]
+    for name,drain in [('stdout',stdout),('stderr',stderr)]:
+        if drain is not None:
+            waited,done=attempt(name+'-wait-failed',lambda:drain.finished.wait(timeout=0.2))
+            finished.append(waited and bool(done))
+            if not waited or not done: result['errors'].append(name+'-not-finished')
+            if drain.error: result['errors'].append(name+'-drain-failed')
+        elif process is not None:
+            stream=getattr(process,name,None)
+            if stream is not None: attempt(name+'-close-failed',stream.close)
+    result['drainsFinished']=all(finished)
+    result['checksPassed']=not result['errors']
+    return result
 
 
 def run(argv, cwd, environment, deadline, cancellation=None, output=None, expected_size=None, capabilities=False):
     """Deadline includes exit and pipe EOF; diagnostic contents never enter summaries."""
     process = None; job = None; stdout = None; stderr = None
+    failure=None; completed=False; phase='admission'; system_error=None
     def summary():
-        return dict(exitCode=process.poll() if process else None,
-                    stdout=stdout.summary() if stdout else None, stderr=stderr.summary() if stderr else None)
+        value=dict(exitCode=process.returncode if process else None,
+                   stdout=stdout.summary() if stdout else None,stderr=stderr.summary() if stderr else None,
+                   cleanup=cleanup_result)
+        if system_error is not None: value['systemError']=system_error
+        return value
     try:
         if cancellation is not None and cancellation.is_set(): raise ProcessFailure('cancelled')
         if time.monotonic() >= deadline: raise ProcessFailure('timeout')
-        job = WindowsJob()
+        phase='containment-create'; job = WindowsJob()
         options = dict(cwd=str(cwd), env=environment, stdin=subprocess.DEVNULL,
                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0, shell=False, close_fds=True)
         if os.name == 'nt': options['creationflags'] = subprocess.CREATE_NEW_PROCESS_GROUP | 4  # CREATE_SUSPENDED
         else: options['start_new_session'] = True
-        process = subprocess.Popen([str(value) for value in argv], **options)
-        job.attach(process)
+        phase='spawn'; process = subprocess.Popen([str(value) for value in argv], **options)
+        phase='containment-attach'; job.attach(process)
         if cancellation is not None and cancellation.is_set(): raise ProcessFailure('cancelled')
         if time.monotonic() >= deadline: raise ProcessFailure('timeout')
-        job.resume(process)
-        stdout = Drain(process.stdout, 4096 if capabilities else 16384, capabilities)
-        stderr = Drain(process.stderr, 4096 if capabilities else 8192, False)
+        phase='containment-resume'; job.resume(process)
+        phase='stdout-drain-start'; stdout = Drain(process.stdout, 4096 if capabilities else 16384, capabilities)
+        phase='stderr-drain-start'; stderr = Drain(process.stderr, 4096 if capabilities else 8192, False)
         while True:
+            phase='monitor'
             if cancellation is not None and cancellation.is_set(): raise ProcessFailure('cancelled')
             if time.monotonic() >= deadline: raise ProcessFailure('timeout')
             if stdout.exceeded.is_set() or stderr.exceeded.is_set(): raise ProcessFailure('diagnostic-limit')
             if output is not None:
+                phase='output-check'
                 try: info = Path(output).lstat()
                 except FileNotFoundError: info = None
                 if info is not None and (not stat.S_ISREG(info.st_mode) or
                     getattr(info, 'st_file_attributes', 0) & 1024 or info.st_size > expected_size):
                     raise ProcessFailure('output-invalid')
-            code = process.poll()
+            phase='poll'; code = process.poll()
             if code is not None and stdout.finished.is_set() and stderr.finished.is_set():
                 if time.monotonic() >= deadline: raise ProcessFailure('timeout')
                 if cancellation is not None and cancellation.is_set(): raise ProcessFailure('cancelled')
                 if stdout.exceeded.is_set() or stderr.exceeded.is_set(): raise ProcessFailure('diagnostic-limit')
                 if stdout.error or stderr.error: raise ProcessFailure('diagnostic-read-failed')
                 if code != 0: raise ProcessFailure('process-failed')
-                return dict(summary=summary(), stdout=bytes(stdout.bytes) if capabilities else None)
-            time.sleep(0.02)
+                completed=True; break
+            phase='poll-wait'; time.sleep(0.02)
     except KeyboardInterrupt:
-        raise ProcessFailure('cancelled', summary()) from None
+        failure=ProcessFailure('cancelled')
     except ProcessFailure as error:
-        error.summary = summary(); raise
-    except OSError:
-        raise ProcessFailure('process-start-failed', summary()) from None
+        failure=error
+    except (OSError,ValueError,RuntimeError) as error:
+        system_error=failure_details(error,phase)
+        failure=ProcessFailure('process-start-failed' if process is None else 'process-supervision-failed')
     finally:
-        # Closing a Windows job kills all members. A POSIX session gives this
-        # reviewed native process a unique group, including inherited pipe holders.
-        if job is not None: job.close()
-        if process is not None:
-            if os.name != 'nt':
-                try: os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError: pass
-            elif process.poll() is None:
-                process.kill()
-            try: process.wait(timeout=2)
-            except subprocess.TimeoutExpired: pass
-            for drain in (stdout, stderr):
-                if drain is not None: drain.finished.wait(timeout=0.2)
-            if stdout is None and process.stdout is not None: process.stdout.close()
-            if stderr is None and process.stderr is not None: process.stderr.close()
+        cleanup_result=cleanup(process,job,stdout,stderr)
+    if failure is None:
+        if cleanup_result['interrupted'] or cancellation is not None and cancellation.is_set(): failure=ProcessFailure('cancelled')
+        elif not cleanup_result['checksPassed']: failure=ProcessFailure('process-cleanup-failed')
+        elif time.monotonic()>=deadline: failure=ProcessFailure('timeout')
+        elif not completed: failure=ProcessFailure('process-supervision-failed')
+    if failure is not None:
+        failure.summary=summary(); raise failure from None
+    return dict(summary=summary(),stdout=bytes(stdout.bytes) if capabilities else None)
