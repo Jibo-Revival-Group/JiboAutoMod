@@ -37,6 +37,12 @@ before/after sector deltas for review. It supports enable/restore and leaves
 already-matching slots unchanged. It does not apply changes or complete provider
 configuration; physical, filesystem and recovery acceptance remain separate.
 
+The [endpoint file preview](Docs/endpoint-file-preview.md) projects an explicit
+API/Hub target into retained Jetstream configuration and records TLS acceptance
+requirements. It preserves credentials and certificate files and exports a
+reviewable semantic file delta. Native/notification/SSM routing and the complete
+conversion plan remain separate work.
+
 ## Current Dev entry points
 
 Start with the [host support matrix](Docs/host-support.md) for this branch.

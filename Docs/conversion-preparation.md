@@ -107,6 +107,9 @@ filesystem support and exact-change planning remain separate work.
    the existing firewall profile in both retained rootfs images and exports exact
    proposed deltas. It covers that component only; full filesystem acceptance,
    endpoint/certificate changes and complete conversion review remain.
+   The [endpoint file preview](endpoint-file-preview.md) now produces the
+   Jetstream API/Hub component from an explicit target and records outstanding
+   TLS requirements. It does not install trust or plan other native/SSM routes.
 3. Invoke the proven bounded writer, read back changes and retain rollback
    evidence without widening its write scope.
 4. Add nonce-bound provider handoff, remote identity/API/socket/speech checks,
