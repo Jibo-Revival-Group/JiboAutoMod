@@ -90,6 +90,11 @@ backup or an executable filesystem/sector change plan.
 
 ## Next integration stages
 
+The [conversion review bundle](conversion-review-bundle.md) now recomputes the
+preparation, recovery, GPT, firewall and endpoint components in one offline call.
+It checks their shared references and backup byte relationships and produces a
+local review page. Complete conversion and apply remain unavailable.
+
 The [bounded capture adapter](bounded-capture-adapter.md) now connects fixed
 read plans to the dedicated native host with component pin checks, deadlines and
 terminal receipts. Its integration tests use the compiled USB-stub host. Real
