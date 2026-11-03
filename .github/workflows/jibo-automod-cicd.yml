@@ -130,7 +130,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path publish -Force | Out-Null
-          Copy-Item JiboModTool.py,conversion_plan.py,recovery_evidence.py,gpt_audit.py,gpt_layout.py,capture_adapter.py,capture_process.py,capture_bundle.py,pe_imports.py,capture_audit.py,firewall_preview.py,endpoint_preview.py,conversion_review.py,storage_evidence.py,config.py,firewall_patch.py,ext4_path.py,diagnose_firewall_cache.py,requirements.txt,README.md -Destination publish
+          Copy-Item JiboModTool.py,conversion_plan.py,recovery_evidence.py,gpt_audit.py,gpt_layout.py,capture_adapter.py,capture_process.py,capture_bundle.py,pe_imports.py,capture_audit.py,firewall_preview.py,endpoint_preview.py,conversion_review.py,storage_evidence.py,review_request.py,config.py,firewall_patch.py,ext4_path.py,diagnose_firewall_cache.py,requirements.txt,README.md -Destination publish
           Copy-Item Docs,Exploits,profiles -Destination publish -Recurse
 
       - name: Verify staged offline entry points and dependencies

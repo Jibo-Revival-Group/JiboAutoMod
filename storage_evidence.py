@@ -85,55 +85,50 @@ def validate(value):
     require(type(value['credentialsRegion']) is str and re.fullmatch('[a-z][a-z0-9-]{0,31}', value['credentialsRegion']))
 
 
-def inspect(manifest_path, manifest_pin, inputs, output):
-    value, _ = E.read_json(manifest_path, manifest_pin)
+def inspect_reader(value, manifest_pin, retained, read_at):
+    """Internal composition API; caller must hold a checked, pinned backup reader.
+
+    This function performs bounded filesystem checks. It does not itself hash or
+    authenticate the backing storage. CLI callers must use inspect(), or supply
+    the reader only from their own checked storage context.
+    """
     validate(value)
-    inputs = B.A.R.ordinary_path(inputs)
-    require(inputs.is_dir())
-    output = Path(output).absolute()
-    B.A.R.ordinary_path(output.parent)
-    require(not output.exists())
-    retained = B.read(inputs / 'jetstream.json', P.LIMIT)
     require(len(retained) == value['jetstream']['sizeBytes'] and F.sha(retained) == value['jetstream']['sha256'])
-    # Parse before opening the large storage file; JSON/region validation is repeated
-    # against the bytes read through the pinned backup descriptor below.
     parse(retained)
-    deadline = time.monotonic() + 600
     results = {}
-    with F.retained_image(inputs / 'full-storage.bin', value['fullStorage'], deadline) as read_at:
-        prefix = b''.join(read_at(offset, min(1048576, value['gptPrefix']['sizeBytes'] - offset))
-                          for offset in range(0, value['gptPrefix']['sizeBytes'], 1048576))
-        require(F.sha(prefix) == value['gptPrefix']['sha256'])
-        layout = F.G.audit_primary_gpt(prefix, value['diskSectors'])
-        for role, path in PATHS.items():
-            matches = [part for part in layout['partitions'] if part['name'] == value['partitions'][role]]
-            require(len(matches) == 1)
-            part = matches[0]
-            start, size = part['start_sector'] * 512, part['size_sectors'] * 512
-            require(2048 <= size <= F.MAX_IMAGE)
-            def partition_read(offset, length):
-                require(type(offset) is int and type(length) is int and 0 <= offset and 0 < length and offset + length <= size)
-                return read_at(start + offset, length)
-            reader = FileReader(partition_read, size)
-            inode, ranges = reader.file(path)
-            raw = reader.read_file(inode, P.LIMIT)
-            parsed = parse(raw)
-            if role == 'jetstream':
-                require(raw == retained)
-                client = parsed.get('HubClient')
-                require(type(client) is dict and type(client.get('region-settings')) is dict)
-                require(value['credentialsRegion'] in client['region-settings'])
-                E.routing_entry(client['region-settings'][value['credentialsRegion']])
-                if 'override' in client:
-                    E.routing_entry(client['override'])
-            else:
-                require(type(parsed.get('region')) is str and parsed['region'] == value['credentialsRegion'])
-            results[role] = dict(partition=part['name'], partitionStartSector=part['start_sector'],
-                                 partitionSizeSectors=part['size_sectors'], partitionRootPath=path,
-                                 assumedRuntimePath=RUNTIME_PATHS[role], inode=inode.number,
-                                 filesystemUuid=reader.filesystem_uuid, fileSizeBytes=len(raw), fileSha256=F.sha(raw),
-                                 extents=[dict(partitionByteOffset=a, fullStorageByteOffset=start + a, allocatedSizeBytes=b - a)
-                                          for a, b in ranges])
+    prefix = b''.join(read_at(offset, min(1048576, value['gptPrefix']['sizeBytes'] - offset))
+                      for offset in range(0, value['gptPrefix']['sizeBytes'], 1048576))
+    require(F.sha(prefix) == value['gptPrefix']['sha256'])
+    layout = F.G.audit_primary_gpt(prefix, value['diskSectors'])
+    for role, path in PATHS.items():
+        matches = [part for part in layout['partitions'] if part['name'] == value['partitions'][role]]
+        require(len(matches) == 1)
+        part = matches[0]
+        start, size = part['start_sector'] * 512, part['size_sectors'] * 512
+        require(2048 <= size <= F.MAX_IMAGE)
+        def partition_read(offset, length):
+            require(type(offset) is int and type(length) is int and 0 <= offset and 0 < length and offset + length <= size)
+            return read_at(start + offset, length)
+        reader = FileReader(partition_read, size)
+        inode, ranges = reader.file(path)
+        raw = reader.read_file(inode, P.LIMIT)
+        parsed = parse(raw)
+        if role == 'jetstream':
+            require(raw == retained)
+            client = parsed.get('HubClient')
+            require(type(client) is dict and type(client.get('region-settings')) is dict)
+            require(value['credentialsRegion'] in client['region-settings'])
+            E.routing_entry(client['region-settings'][value['credentialsRegion']])
+            if 'override' in client:
+                E.routing_entry(client['override'])
+        else:
+            require(type(parsed.get('region')) is str and parsed['region'] == value['credentialsRegion'])
+        results[role] = dict(partition=part['name'], partitionStartSector=part['start_sector'],
+                             partitionSizeSectors=part['size_sectors'], partitionRootPath=path,
+                             assumedRuntimePath=RUNTIME_PATHS[role], inode=inode.number,
+                             filesystemUuid=reader.filesystem_uuid, fileSizeBytes=len(raw), fileSha256=F.sha(raw),
+                             extents=[dict(partitionByteOffset=a, fullStorageByteOffset=start + a, allocatedSizeBytes=b - a)
+                                      for a, b in ranges])
     result = dict(schema='openjibo.storage-file-evidence.v1', checkedAtUtc=datetime.now(timezone.utc).isoformat(),
                   manifestSha256=manifest_pin, manifestCanonicalSha256=P.digest(value),
                   fullStorage=value['fullStorage'], gptPrefix=value['gptPrefix'], files=results,
@@ -153,6 +148,22 @@ def inspect(manifest_path, manifest_pin, inputs, output):
                               [('filesystemProfile', F), ('ext4Parser', F.E), ('gptParser', F.G),
                                ('endpointParser', E), ('byteReader', B), ('preparation', P), ('pathChecker', B.A.R)]})
     result['codeSha256']['storageEvidence'] = F.sha(Path(__file__).read_bytes())
+    return result
+
+
+def inspect(manifest_path, manifest_pin, inputs, output):
+    value, _ = E.read_json(manifest_path, manifest_pin)
+    validate(value)
+    inputs = B.A.R.ordinary_path(inputs)
+    require(inputs.is_dir())
+    output = Path(output).absolute()
+    B.A.R.ordinary_path(output.parent)
+    require(not output.exists())
+    retained = B.read(inputs / 'jetstream.json', P.LIMIT)
+    require(len(retained) == value['jetstream']['sizeBytes'] and F.sha(retained) == value['jetstream']['sha256'])
+    parse(retained)
+    with F.retained_image(inputs / 'full-storage.bin', value['fullStorage'], time.monotonic() + 600) as read_at:
+        result = inspect_reader(value, manifest_pin, retained, read_at)
     output = B.new_directory(output)
     B.write(output / 'evidence.json', P.canonical(result) + b'\n')
     return result

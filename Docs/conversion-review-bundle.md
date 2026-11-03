@@ -12,6 +12,43 @@ components, not a complete conversion plan. `reviewAssembled` is an export
 status. `completeConversionPlan`, `executionSupported` and `readyForApply`
 always remain false.
 
+## One-command request and review
+
+When the retained files and six original component JSON inputs below are already
+prepared, `review_request.py` generates the seventh storage manifest and all
+outer pins, then runs the v2 review. It needs no pre-existing `storage-input.json`
+or outer review manifest, and does not modify the retained directory. Explicit
+partition selection is required; the names below are placeholders, not defaults.
+
+Windows:
+
+```powershell
+py -3 review_request.py --inputs C:\review\retained --output C:\review\new-review `
+  --jetstream-partition <exact-config-partition> --credentials-partition <exact-credential-partition>
+```
+
+macOS/Linux:
+
+```bash
+python3 review_request.py --inputs /review/retained --output /review/new-review \
+  --jetstream-partition <exact-config-partition> --credentials-partition <exact-credential-partition>
+```
+
+Open the resulting `review.html`. The indexed `request/review-input.json` and
+`request/storage-input.json` preserve generated raw-file pins. Stdout contains
+the manifest and canonical review hashes. `inputPinOrigin` explicitly records
+`generated-from-supplied-files`; generating hashes is not prior human approval or
+proof of provenance. The original inventory audit reference and endpoint target
+reference must already match their actual supplied files. This command does not
+invent device identity, acquire missing backups, produce component inputs, guess
+partitions, enroll a provider or apply changes.
+
+For a separately reviewed pinned replay, use `conversion_review.py` with the
+generated outer manifest, its reviewed `--manifest-sha256`, original `--inputs`,
+a new `--output`, and `--storage-input` pointing to the generated storage manifest.
+That optional location override is v2-only and still requires the exact pinned
+file bytes. Input pin origin is then `externally-supplied-manifest-pin`.
+
 ## Fixed retained input directory
 
 Prepare these ordinary local files using the existing component contracts:
@@ -104,9 +141,72 @@ outside this check.
 These relations establish byte consistency with an operator-supplied reference.
 They do not establish trustworthy acquisition, freshness, physical association,
 the actual installed release, or that calibration belongs to the robot.
-The Jetstream file's filesystem path and supplied active credentials region are
-**not linked to the storage backup** by this version. That gap is shown in both
-the review page and JSON; matching unrelated hashes cannot fill it.
+With a v1 input, the Jetstream file's filesystem path and supplied active
+credentials region are **not linked to the storage backup**. That gap remains
+explicit in both page and JSON. Use the v2 input below to recompute those byte
+relationships; runtime mount/release association still remains unverified.
+
+## Storage-bound review v2
+
+Use the same command and retained directory, plus `storage-input.json` following
+the [storage file evidence contract](storage-file-evidence.md). Explicitly select
+the two GPT partition names after reviewing retained evidence. Do not infer them
+from extraction folder numbers. The storage manifest must use exactly the same
+full-storage hash/size as the inventory, GPT prefix hash/size and disk sector count
+as the firewall input, and Jetstream hash/size and region as the endpoint input.
+Any mismatch is refused before creating output.
+
+The outer manifest changes to v2 and adds a seventh raw-file pin:
+
+```json
+{
+  "schema": "openjibo.conversion-review-input.v2",
+  "files": {
+    "inventory": "<inventory-file-sha256>",
+    "target": "<target-file-sha256>",
+    "audit": "<audit-file-sha256>",
+    "recoveryFiles": "<recovery-map-file-sha256>",
+    "firewallInput": "<firewall-manifest-file-sha256>",
+    "endpointInput": "<endpoint-manifest-file-sha256>",
+    "storageInput": "<storage-input-file-sha256>"
+  }
+}
+```
+
+The builder resolves the two fixed partition-root files directly through the
+held full-storage descriptor, after the existing recovery checks. It does not
+invoke the standalone CLI or reopen/hash the entire backup for this added check.
+The original recovery checker still separately hashes recovery files. Subsequent
+filesystem reads share the 600-second storage budget, with 8192 requests, 16 MiB
+total and 1 MiB per request. The existing ext4/JSON limits remain unchanged.
+Unsupported filesystem features remain refused; no real release is admitted by
+synthetic fixture success.
+
+The output schema is `openjibo.conversion-review-bundle.v2`. It adds recomputed
+`storage/evidence.json`, its canonical hash, a summary of file hashes/locations
+and matched region, and these explicit statuses:
+
+| Field | Meaning |
+| --- | --- |
+| `storageFileEvidenceRecomputed` | The builder ran the reader on checked backup bytes |
+| `jetstreamBackupBytesMatched` | The partition-root file matches retained configuration exactly |
+| `credentialRegionBackupBytesMatched` | The credential file's region matches the endpoint input |
+| `mountMappingVerified` | Always false; actual runtime mounts remain unverified |
+
+The existing `endpointStoragePathAssociationVerified` and
+`credentialsRegionAssociationVerified` remain false: byte consistency does not
+establish which files the installed runtime actually uses. Physical/release,
+filesystem integrity/ownership, effective routing/TLS/provider and apply/rollback
+claims also remain false. The static page shows the new evidence separately from
+these remaining gates. No positive supplied storage report is accepted as input.
+The v1 input retains six pins, v1 output and its original unverified coverage;
+adding an unversioned extra pin is refused.
+
+The storage component exports hashes and the region, without full credential
+contents or embedded secrets. Existing endpoint before/after payloads can still
+contain private settings from the retained configuration. Keep the whole bundle
+private. A failure at any component or the final storage mutation check prevents
+the terminal `review.json`; partial output must not be used as a completed review.
 
 ## Review the result
 

@@ -50,9 +50,10 @@ def fixture(inputs,isolated=False):
 
 def write_inputs(inputs,values,manifest_path):
     pins={}
-    for name,filename in V.INPUTS.items():
+    with_storage='storageInput' in values
+    for name,filename in (V.INPUTS_V2 if with_storage else V.INPUTS).items():
         raw=raw_json(values[name]); (inputs/filename).write_bytes(raw); pins[name]=digest(raw)
-    manifest=dict(schema='openjibo.conversion-review-input.v1',files=pins)
+    manifest=dict(schema='openjibo.conversion-review-input.v2' if with_storage else 'openjibo.conversion-review-input.v1',files=pins)
     raw=raw_json(manifest); manifest_path.write_bytes(raw); return digest(raw)
 
 
