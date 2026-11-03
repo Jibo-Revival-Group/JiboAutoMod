@@ -10,10 +10,10 @@ import sys
 import tempfile
 import zipfile
 
-SCRIPTS=('demo_review.py','review_request.py','conversion_review.py','storage_evidence.py','conversion_plan.py',
+SCRIPTS=('demo_review.py','review_request.py','conversion_review.py','storage_evidence.py','oobe_intake.py','conversion_plan.py',
          'recovery_evidence.py','gpt_audit.py','gpt_layout.py','firewall_preview.py','firewall_patch.py','ext4_path.py',
          'endpoint_preview.py','capture_bundle.py','capture_adapter.py','capture_process.py','capture_audit.py','pe_imports.py')
-DOCS=('offline-preview.md','conversion-preparation.md','conversion-review-bundle.md','storage-file-evidence.md',
+DOCS=('offline-preview.md','oobe-storage-intake.md','conversion-preparation.md','conversion-review-bundle.md','storage-file-evidence.md',
       'recovery-file-check.md','primary-gpt-audit.md','firewall-sector-preview.md','endpoint-file-preview.md',
       'host-support.md','capture-process-cleanup.md','bounded-capture-adapter.md','capture-candidate.md','read-only-capture-build.md')
 DEMO_FILES=('inventory.json','target.json','audit.json','recovery-files.json','firewall-input.json','endpoint-input.json',
@@ -46,7 +46,7 @@ def package(source,output,revision):
     if output.exists(): raise ValueError('new output required')
     files={name:read(source/name).replace(b'\r\n',b'\n') for name in SCRIPTS}
     files.update({'Docs/'+name:read(source/'Docs'/name).replace(b'\r\n',b'\n') for name in DOCS})
-    files['README.md']=files['Docs/offline-preview.md'].replace(b'](conversion-review-bundle.md#',b'](Docs/conversion-review-bundle.md#')
+    files['README.md']=files['Docs/offline-preview.md'].replace(b'](conversion-review-bundle.md#',b'](Docs/conversion-review-bundle.md#').replace(b'](oobe-storage-intake.md)',b'](Docs/oobe-storage-intake.md)')
     files['profiles/S21firewall.v1']=read(source/'profiles/S21firewall.v1')
     if sha(files['profiles/S21firewall.v1'])!='cb34db864fee2e6725fa09a293c60fff003b87348a16553419926ee7cc1a1cc8':
         raise ValueError('profile changed')
@@ -55,6 +55,7 @@ def package(source,output,revision):
     sys.path.insert(0,str(source/'tests')); sys.path.insert(0,str(source))
     import test_conversion_review_storage as fixture
     import test_conversion_review as base
+    import test_storage_evidence as storage
     with tempfile.TemporaryDirectory() as temporary:
         retained=Path(temporary).resolve()/'retained'
         values=fixture.fixture(retained)
@@ -67,6 +68,16 @@ def package(source,output,revision):
         base.write_inputs(retained,values,Path(temporary)/'unused.json')
         if {p.name for p in retained.iterdir()}!=set(DEMO_FILES): raise ValueError('unexpected demo files')
         files.update({'demo/retained/'+name:read(retained/name) for name in DEMO_FILES})
+        disk=bytearray(files['demo/retained/full-storage.bin'])
+        blank=storage.filesystem('credentials',b'{"accessKeyId":"","secretAccessKey":"","region":""}')
+        layout=base.V.F.G.audit_primary_gpt(files['demo/retained/gpt-prefix.bin'],values['firewallInput']['diskSectors'])
+        part=next(p for p in layout['partitions'] if p['name']=='var-test'); start=part['start_sector']*512
+        if part['size_sectors']*512!=len(blank): raise ValueError('synthetic partition changed')
+        disk[start:start+len(blank)]=blank
+        files['demo/oobe/full-storage.bin']=bytes(disk)
+        intake=dict(schema='openjibo.oobe-intake-input.v1',diskSectors=values['firewallInput']['diskSectors'],
+                    fullStorage=dict(sha256=sha(disk),sizeBytes=len(disk)),gptPrefix=values['firewallInput']['gptPrefix'],credentialsPartition='var-test')
+        files['demo/oobe/intake-input.json']=base.raw_json(intake)
     files['Run-Demo.cmd']=(
         '@echo off\r\nsetlocal\r\npushd "%~dp0"\r\n'
         'where py >nul 2>nul\r\nif errorlevel 1 (\r\n  python -I -B demo_review.py --open %*\r\n) else (\r\n  py -3 -I -B demo_review.py --open %*\r\n)\r\n'

@@ -31,6 +31,18 @@ The HTML page shows recovery/GPT checks, firewall and endpoint previews, matched
 configuration/region bytes and the remaining gates. **Apply is unavailable.**
 Generated request manifests and a file hash index are retained with each result.
 
+The separate pre-provisioning demo uses a synthetic blank credential file:
+
+```text
+python demo_review.py --oobe-intake --open
+```
+
+Use the same OS-specific Python command as above. This page is explicitly marked
+Synthetic demo and observes missing/blank credential fields without inventing a
+region. It does not prove factory/OOBE state or readiness to provision. See
+[OOBE storage intake](oobe-storage-intake.md) in Docs for the separate contract.
+The older preview.1 release remains unchanged; it has only the original demo.
+
 ## Review your retained inputs
 
 Prepare the documented inventory, target, audit, recovery map, firewall/endpoint
