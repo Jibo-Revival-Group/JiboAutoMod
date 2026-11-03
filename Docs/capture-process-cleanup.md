@@ -19,6 +19,19 @@ parent. The new tests inject termination, job-close, poll, pipe-close, thread-
 startup and wait failures. Fixing this demonstrated failure class does not
 establish that it caused the original macOS event.
 
+The new CI stress run reproduced a concrete macOS `killpg` EPERM, followed by a
+reaped parent with exit zero and finished pipes. Apple's
+[XNU group-signal implementation](https://raw.githubusercontent.com/apple-oss-distributions/xnu/main/bsd/kern/kern_sig.c)
+filters zombies during group iteration and can return EPERM when no eligible
+member is found. The observation is consistent with that exit race. The old
+incident had no errno trace, so its exact historical cause remains unproven.
+
+An EPERM is resolved only after the known parent has been reaped **and** a
+signal-0 probe reports the group absent through ESRCH. The initial error and
+its resolution remain recorded. A present group, a denied probe, an unconfirmed
+parent wait or another termination error still fails cleanup. There is no
+unconditional permission-error suppression and no repeated capture command.
+
 ## Preserved boundaries
 
 The native arguments, read-only protocol, bundle pins, private staging,
@@ -47,6 +60,10 @@ Existing process summary fields remain. `cleanup` now records:
 - `scope`: Windows job or POSIX process group;
 - termination requests, parent wait result/exit code, and whether started drains finished;
 - static `errors` and `failures` entries, interrupted status, and `checksPassed`.
+
+`errors` lists unresolved cleanup problems. `failures` also preserves resolved
+observations with `resolved`/`resolution` fields. `groupAbsenceCheckRequested`
+and `groupAbsenceVerified` distinguish the post-reap probe from an assumption.
 
 These are supervisor observations and API acknowledgements, not proof of physical
 reset, complete adversarial descendant containment, USB recovery or normal boot.

@@ -1,5 +1,6 @@
 """Bounded native process supervision. No device or platform-loader imports."""
 import hashlib
+import errno
 import os
 from pathlib import Path
 import signal
@@ -129,19 +130,20 @@ def cleanup(process,job,stdout,stderr):
     """Attempt every owned cleanup step; never replace the primary failure."""
     result=dict(scope='windows-job' if os.name=='nt' else 'posix-process-group',groupTerminationRequested=False,
                 parentTerminationRequested=False,parentReaped=False,parentExitCode=None,drainsFinished=False,
-                interrupted=False,errors=[],failures=[])
+                groupAbsenceCheckRequested=False,groupAbsenceVerified=False,interrupted=False,errors=[],failures=[])
+    group_failure=None
     def attempt(code,operation):
         try: return True,operation()
         except (Exception,KeyboardInterrupt) as error:
             result['errors'].append(code)
-            result['failures'].append(failure_details(error,code))
+            result['failures'].append(dict(failure_details(error,code),resolved=False))
             if isinstance(error,KeyboardInterrupt): result['interrupted']=True
             return False,None
     if job is not None:
         closed,value=attempt('job-close-failed',job.close)
         if closed and value is False:
             result['errors'].append('job-close-failed')
-            result['failures'].append(dict(phase='job-close-failed',errorType='not-confirmed',errorNumber=None))
+            result['failures'].append(dict(phase='job-close-failed',errorType='not-confirmed',errorNumber=None,resolved=False))
         if os.name=='nt' and process is not None: result['groupTerminationRequested']=True
     if process is not None:
         if os.name!='nt':
@@ -149,7 +151,10 @@ def cleanup(process,job,stdout,stderr):
             def terminate_group():
                 try: os.killpg(process.pid,signal.SIGKILL)
                 except ProcessLookupError: pass
-            attempt('group-termination-failed',terminate_group)
+            signalled,_=attempt('group-termination-failed',terminate_group)
+            if not signalled:
+                observed=result['failures'][-1]
+                if observed['errorType']=='os-error' and observed['errorNumber']==errno.EPERM: group_failure=observed
         polled,code=attempt('parent-poll-failed',process.poll)
         if not polled or code is None:
             result['parentTerminationRequested']=True
@@ -161,6 +166,20 @@ def cleanup(process,job,stdout,stderr):
         result['parentReaped']=reaped and type(code) is int
         result['parentExitCode']=code if result['parentReaped'] else None
         if reaped and not result['parentReaped']: result['errors'].append('parent-reap-unconfirmed')
+        if group_failure is not None and result['parentReaped']:
+            # Darwin can return EPERM for a zombie-only group. Never assume an
+            # EPERM is harmless: first reap the known parent, then require ESRCH
+            # from a signal-0 existence probe. A present/denied group still fails.
+            result['groupAbsenceCheckRequested']=True
+            def group_absent():
+                try: os.killpg(process.pid,0)
+                except ProcessLookupError: return True
+                return False
+            queried,absent=attempt('group-absence-check-failed',group_absent)
+            if queried and absent:
+                result['groupAbsenceVerified']=True
+                result['errors'].remove('group-termination-failed')
+                group_failure.update(resolved=True,resolution='group-absent-after-parent-reap')
     finished=[]
     for name,drain in [('stdout',stdout),('stderr',stderr)]:
         if drain is not None:

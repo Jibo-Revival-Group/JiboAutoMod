@@ -138,5 +138,49 @@ class CaptureProcess(unittest.TestCase):
         self.assertEqual(caught.exception.code,'cancelled')
         self.assertTrue(caught.exception.summary['cleanup']['interrupted']); self.assertEqual(process.waits,1)
 
+    def test_permission_error_resolved_only_by_absence_after_parent_reap(self):
+        calls=[]; process=FakeProcess(False)
+        def signal_group(pid,signal):
+            calls.append(signal)
+            if signal==9: raise PermissionError(1,'DO_NOT_ECHO')
+            self.assertEqual(process.waits,1)
+            raise ProcessLookupError(3,'DO_NOT_ECHO')
+        result=self.execute(process,killpg=signal_group)
+        cleanup=result['summary']['cleanup']
+        self.assertEqual(calls,[9,0]); self.assertTrue(cleanup['checksPassed']); self.assertTrue(cleanup['groupAbsenceVerified'])
+        self.assertEqual(cleanup['errors'],[]); self.assertTrue(cleanup['failures'][0]['resolved'])
+        self.assertEqual(cleanup['failures'][0]['resolution'],'group-absent-after-parent-reap')
+
+    def test_present_group_does_not_resolve_permission_failure(self):
+        def signal_group(pid,signal):
+            if signal==9: raise PermissionError(1,'DO_NOT_ECHO')
+        with self.assertRaises(N.ProcessFailure) as caught: self.execute(FakeProcess(False),killpg=signal_group)
+        self.assertEqual(caught.exception.code,'process-cleanup-failed')
+        cleanup=caught.exception.summary['cleanup']; self.assertTrue(cleanup['groupAbsenceCheckRequested']); self.assertFalse(cleanup['groupAbsenceVerified'])
+        self.assertIn('group-termination-failed',cleanup['errors'])
+
+    def test_denied_absence_probe_remains_a_failure(self):
+        def signal_group(pid,signal): raise PermissionError(1 if signal==9 else 13,'DO_NOT_ECHO')
+        with self.assertRaises(N.ProcessFailure) as caught: self.execute(FakeProcess(False),killpg=signal_group)
+        cleanup=caught.exception.summary['cleanup']; self.assertFalse(cleanup['groupAbsenceVerified'])
+        self.assertIn('group-termination-failed',cleanup['errors']); self.assertIn('group-absence-check-failed',cleanup['errors'])
+        self.assertNotIn('DO_NOT_ECHO',json.dumps(caught.exception.summary))
+
+    def test_permission_error_not_resolved_when_parent_reap_is_unconfirmed(self):
+        calls=[]
+        def signal_group(pid,signal): calls.append(signal); raise PermissionError(1,'DO_NOT_ECHO')
+        class BadWait(FakeProcess):
+            def wait(self,timeout): raise subprocess.TimeoutExpired('DO_NOT_ECHO',timeout)
+        with self.assertRaises(N.ProcessFailure) as caught: self.execute(BadWait(False),killpg=signal_group)
+        cleanup=caught.exception.summary['cleanup']; self.assertFalse(cleanup['groupAbsenceCheckRequested']); self.assertFalse(cleanup['parentReaped'])
+        self.assertEqual(calls,[9]); self.assertIn('group-termination-failed',cleanup['errors'])
+
+    def test_other_group_errors_are_not_resolved_by_a_probe(self):
+        calls=[]
+        def signal_group(pid,signal): calls.append(signal); raise OSError(5,'DO_NOT_ECHO')
+        with self.assertRaises(N.ProcessFailure) as caught: self.execute(FakeProcess(False),killpg=signal_group)
+        self.assertEqual(caught.exception.code,'process-cleanup-failed'); self.assertEqual(calls,[9])
+        self.assertFalse(caught.exception.summary['cleanup']['groupAbsenceCheckRequested'])
+
 
 if __name__=='__main__': unittest.main()
