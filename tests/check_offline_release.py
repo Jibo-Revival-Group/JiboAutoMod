@@ -31,7 +31,7 @@ def main():
     raw=archive.read_bytes()
     assert raw==(root/'repeat/OpenJibo-Offline-Review.zip').read_bytes()
     assert sha(raw)==summary['sha256']==(root/'release/OpenJibo-Offline-Review.zip.sha256').read_text().split()[0]
-    extracted=root/'extracted'; extracted.mkdir()
+    extracted=root/'extracted package'; extracted.mkdir()
     with zipfile.ZipFile(archive) as bundle:
         entries=bundle.infolist()
         assert len(entries)<=100 and sum(i.file_size for i in entries)<=16777216
@@ -65,7 +65,7 @@ def main():
     for item in review['files']:
         assert sha((root/'demo-result'/item['file']).read_bytes())==item['sha256']
     env=os.environ.copy(); env['PATH']=str(Path(sys.executable).parent)+os.pathsep+env.get('PATH','')
-    launcher=([os.environ.get('COMSPEC','cmd.exe'),'/c',str(extracted/'Run-Demo.cmd')] if os.name=='nt' else ['sh',str(extracted/'run-demo.sh')])
+    launcher=([os.environ.get('COMSPEC','cmd.exe'),'/d','/c','call',str(extracted/'Run-Demo.cmd')] if os.name=='nt' else ['sh',str(extracted/'run-demo.sh')])
     launched=subprocess.run(launcher+['--no-open','--output',str(root/'launcher-result')],cwd=root,env=env,capture_output=True,timeout=60)
     assert launched.returncode==0,launched.stderr
     assert (root/'launcher-result/review.json').is_file()
