@@ -78,10 +78,12 @@ as that adapter.
 
 The [dedicated storage-read-only build](read-only-capture-build.md) now removes
 write/erase handlers from a separate host/payload pair. It is a source/build
-prerequisite with stub checks, not hardware acceptance or a bounded capture adapter.
+prerequisite with stub checks. The separate [bounded adapter](bounded-capture-adapter.md)
+now supplies pinned-input checks and supervised execution, still without real
+hardware acceptance or physical identity proof.
 
 CI runs the offline audit on Python 3.9 across Windows/macOS/Linux and separately
-tests the legacy writer/parser projection. Release staging includes all three
+tests the legacy writer/parser projection. Release staging includes the offline
 offline entry points and their dependencies and invokes them from an unrelated
 working directory before packaging. These tests use synthetic files and do not
 certify USB, drivers, real hardware conversion or restoration. See the separate

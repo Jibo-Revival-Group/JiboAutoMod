@@ -10,6 +10,7 @@ README reference are not shipped by the restructured Dev branch.
 | `recovery_evidence.py` | File-check contracts in CI | File-check contracts in CI | File-check contracts in CI | Streams retained regular backup files and compares supplied hash/size; does not prove robot association or restoration |
 | `gpt_audit.py` | Retained GPT-prefix tests in CI | Retained GPT-prefix tests in CI | Retained GPT-prefix tests in CI | Validates a narrow primary-table profile; does not capture hardware or enable conversion |
 | Dedicated `readonly` build | Host/policy tests; no ARM payload build in Windows job | Host/payload build and policy tests | Host/payload build and policy tests | Compile-time write exclusion and stub transport checks; no hardware admission |
+| `capture_adapter.py` | Process/job and stub-native tests | Process/group and stub-native tests | Process/group and stub-native tests | Pinned supplied components, fixed plans and bounded supervision; hardware/provenance/dependency acceptance remains separate |
 | `Exploits/Shofel` native compilation | UCRT64 loader build in CI | Toolchain build in CI | Toolchain build in CI | Compiles the selected native targets; does not prove USB access or device writes |
 | `JiboModTool.py` interactive device menu | Adapter missing: `Exploits/Platform/Windows` is an empty placeholder file | Darwin adapter missing | Generic Linux adapter exists | Developer integration only; not a complete cross-OS conversion release |
 

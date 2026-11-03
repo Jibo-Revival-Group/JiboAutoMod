@@ -90,6 +90,12 @@ backup or an executable filesystem/sector change plan.
 
 ## Next integration stages
 
+The [bounded capture adapter](bounded-capture-adapter.md) now connects fixed
+read plans to the dedicated native host with component pin checks, deadlines and
+terminal receipts. Its integration tests use the compiled USB-stub host. Real
+artifact provenance/dependencies, hardware admission and recovery remain gates;
+capture receipts do not make this preparation plan executable.
+
 The [offline primary GPT audit](primary-gpt-audit.md) can now inspect retained
 prefix evidence without importing device-control code. It checks a bounded
 partition-table profile, while native capture, device association, release/
