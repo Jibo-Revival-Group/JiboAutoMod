@@ -103,8 +103,10 @@ filesystem support and exact-change planning remain separate work.
 
 1. Connect real read-only host/device audit adapters, supported layout evidence
    and immutable recovery verification to this contract.
-2. Resolve a supported conversion profile into exact file/sector/certificate
-   changes and show them for confirmation.
+2. The [offline firewall sector preview](firewall-sector-preview.md) now resolves
+   the existing firewall profile in both retained rootfs images and exports exact
+   proposed deltas. It covers that component only; full filesystem acceptance,
+   endpoint/certificate changes and complete conversion review remain.
 3. Invoke the proven bounded writer, read back changes and retain rollback
    evidence without widening its write scope.
 4. Add nonce-bound provider handoff, remote identity/API/socket/speech checks,

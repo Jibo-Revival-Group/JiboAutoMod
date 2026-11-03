@@ -25,3 +25,4 @@ jobs:
           python -B -m unittest discover -s tests -p test_capture_adapter.py
           python -B -m unittest discover -s tests -p test_capture_bundle.py
           python -B -m unittest discover -s tests -p test_capture_audit.py
+          python -B -m unittest discover -s tests -p test_firewall_preview.py

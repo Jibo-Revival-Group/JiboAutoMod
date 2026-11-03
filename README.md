@@ -31,6 +31,12 @@ fixed review plan. It launches no native process. A separate offline receipt
 auditor joins a later completed capture to the primary GPT checks. Both preserve
 the outstanding physical identity, runtime compatibility and recovery limits.
 
+The [offline firewall sector preview](Docs/firewall-sector-preview.md) now checks
+both retained rootfs images against the known firewall profile and exports exact
+before/after sector deltas for review. It supports enable/restore and leaves
+already-matching slots unchanged. It does not apply changes or complete provider
+configuration; physical, filesystem and recovery acceptance remain separate.
+
 ## Current Dev entry points
 
 Start with the [host support matrix](Docs/host-support.md) for this branch.
