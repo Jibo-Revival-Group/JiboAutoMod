@@ -6,6 +6,8 @@ README reference are not shipped by the restructured Dev branch.
 
 | Entry point | Windows | macOS | Linux | What passing means |
 | --- | --- | --- | --- | --- |
+| Offline preview `demo_review.py` and host launchers | Extracted demo/launcher CI | Extracted demo/launcher CI | Extracted demo/launcher CI | Runs synthetic review with Python 3.9+; no native components, real credentials or robot required |
+| `review_request.py` | One-command review CI | One-command review CI | One-command review CI | Generates pinned v2 requests from prepared retained inputs and explicit partitions; no acquisition or apply |
 | `conversion_plan.py` | Plan/export contracts in CI | Plan/export contracts in CI | Plan/export contracts in CI | Validates supplied preparation fields and exports a new plan; never applies it |
 | `recovery_evidence.py` | File-check contracts in CI | File-check contracts in CI | File-check contracts in CI | Streams retained regular backup files and compares supplied hash/size; does not prove robot association or restoration |
 | `gpt_audit.py` | Retained GPT-prefix tests in CI | Retained GPT-prefix tests in CI | Retained GPT-prefix tests in CI | Validates a narrow primary-table profile; does not capture hardware or enable conversion |
