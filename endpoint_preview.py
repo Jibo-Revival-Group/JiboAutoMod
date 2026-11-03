@@ -150,7 +150,9 @@ def preview(manifest_path,manifest_pin,target_path,target_pin,jetstream_path,out
 
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__)
+    class Parser(argparse.ArgumentParser):
+        def error(self,message): self.exit(2,'Endpoint preview refused; check required arguments. See Docs/endpoint-file-preview.md.\n')
+    parser=Parser(description=__doc__)
     for name in ('manifest','target','jetstream','output'): parser.add_argument('--'+name,required=True,type=Path)
     for name in ('manifest-sha256','target-sha256'): parser.add_argument('--'+name,required=True)
     args=parser.parse_args()

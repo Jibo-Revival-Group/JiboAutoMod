@@ -147,6 +147,8 @@ class EndpointPreview(unittest.TestCase):
         result=subprocess.run(command,cwd=self.root,capture_output=True,text=True,timeout=15)
         self.assertEqual(result.returncode,0,result.stderr); self.assertNotIn('PRIVATE_INPUT_FIXTURE',result.stdout+result.stderr)
         self.assertNotIn(str(self.root),result.stdout+result.stderr)
+        invalid=subprocess.run([*command,'--unknown',str(self.root)],cwd=self.root,capture_output=True,text=True,timeout=10)
+        self.assertEqual(invalid.returncode,2); self.assertNotIn(str(self.root),invalid.stdout+invalid.stderr)
         probe=subprocess.run([sys.executable,'-I','-B','-c',"import runpy,sys; runpy.run_path(sys.argv[1],run_name='offline_probe'); assert not any(n.startswith(('Exploits','usb','tkinter','config')) for n in sys.modules)",str(Path(V.__file__))],cwd=self.root,capture_output=True,timeout=10)
         self.assertEqual(probe.returncode,0,probe.stderr)
 
