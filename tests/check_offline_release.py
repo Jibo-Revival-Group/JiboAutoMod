@@ -69,15 +69,23 @@ def main():
     launched=subprocess.run(launcher+['--no-open','--output',str(root/'launcher-result')],cwd=root,env=env,capture_output=True,timeout=60)
     assert launched.returncode==0,launched.stderr
     assert (root/'launcher-result/review.json').is_file()
+    intake_run=subprocess.run([sys.executable,'-I','-B',str(extracted/'demo_review.py'),'--oobe-intake','--output',str(root/'intake-result')],
+                              cwd=root,capture_output=True,timeout=60)
+    assert intake_run.returncode==0,intake_run.stderr
+    intake=json.loads((root/'intake-result/intake.json').read_bytes())
+    assert intake['syntheticDemo'] and intake['intakeComplete'] and not intake['oobeStateVerified'] and not intake['readyForApply']
+    assert intake['credentialObservation']['kind']=='identity-fields-absent-or-blank' and intake['credentialObservation']['region'] is None
+    assert set(intake['credentialObservation']['fields'].values())=={'blank'}
+    assert b'Synthetic demo' in (root/'intake-result/intake.html').read_bytes()
     assert before=={name:sha((extracted/name).read_bytes()) for name in names}
-    for script in ('review_request.py','conversion_review.py','storage_evidence.py','capture_adapter.py','demo_review.py'):
+    for script in ('review_request.py','conversion_review.py','storage_evidence.py','oobe_intake.py','capture_adapter.py','demo_review.py'):
         help_run=subprocess.run([sys.executable,'-I','-B',str(extracted/script),'--help'],cwd=root,capture_output=True,timeout=10)
         assert help_run.returncode==0,help_run.stderr
     proof=dict(schema='openjibo.offline-review-release-check.v1',sourceRevision=args.source_revision,archiveSha256=sha(raw),
                builderSourceSha256=sha((source/'tools/package_offline_review.py').read_bytes().replace(b'\r\n',b'\n')),
                checkSourceSha256=sha(Path(__file__).read_bytes().replace(b'\r\n',b'\n')),
                repeatedBuildIdentical=True,allPayloadHashesVerified=True,extractedDemoPassed=True,hostLauncherPassed=True,
-               inputsUnchanged=True,syntheticOnly=True,readyForApply=False)
+               inputsUnchanged=True,syntheticOobeIntakePassed=True,syntheticOnly=True,readyForApply=False)
     (root/'release-check.json').write_text(json.dumps(proof,indent=2)+'\n',encoding='utf-8')
     print('Portable offline release passed: repeatable archive, all hashes, extracted demo and host launcher; synthetic only.')
 

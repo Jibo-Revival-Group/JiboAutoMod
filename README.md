@@ -1,5 +1,10 @@
 # Jibo Auto-Mod Tool
 
+The [pre-provisioning storage intake](Docs/oobe-storage-intake.md) now distinguishes
+absent, empty, blank and partial credential observations without assigning a
+region or changing the credentialed review's requirements. It is read-only and
+does not establish factory/OOBE state, ownership or apply readiness.
+
 For a portable release with a runnable synthetic conversion review, start with
 the [offline preview guide](Docs/offline-preview.md). That package uses Python
 3.9+ on Windows, macOS and Linux and excludes native binaries/device payloads.
