@@ -25,6 +25,19 @@ jobs:
             python -B -m unittest discover -s tests -p $contract
             if ($LASTEXITCODE -ne 0) { throw "Compatibility contract failed: $contract" }
           }
+      - name: Verify portable offline release with minimum Python
+        shell: pwsh
+        run: |
+          python -I -B tests/check_offline_release.py --source . --output "$env:RUNNER_TEMP/offline-review-minimum" --source-revision '${{ github.sha }}'
+          if ($LASTEXITCODE -ne 0) { throw 'Minimum-Python offline release failed.' }
+      - name: Retain minimum-Python offline release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: OfflineReviewCompatibility-${{ runner.os }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/offline-review-minimum/release/*
+            ${{ runner.temp }}/offline-review-minimum/release-check.json
+          if-no-files-found: error
       - name: Stress bounded Python process cleanup without hardware
         shell: pwsh
         timeout-minutes: 5

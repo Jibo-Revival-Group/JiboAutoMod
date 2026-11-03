@@ -197,6 +197,23 @@ jobs:
           path: ${{ runner.temp }}/storage-file-contract
           if-no-files-found: error
 
+      - name: Build and exercise portable offline review release
+        if: matrix.package
+        shell: pwsh
+        run: |
+          python -I -B tests/check_offline_release.py --source . --output "$env:RUNNER_TEMP/offline-review-release" --source-revision '${{ github.sha }}'
+          if ($LASTEXITCODE -ne 0) { throw 'Portable offline release failed.' }
+
+      - name: Upload portable offline review release candidate
+        if: matrix.package
+        uses: actions/upload-artifact@v4
+        with:
+          name: OfflineReview-${{ runner.os }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/offline-review-release/release/*
+            ${{ runner.temp }}/offline-review-release/release-check.json
+          if-no-files-found: error
+
       - name: Package artifact
         if: matrix.package
         shell: pwsh

@@ -1,5 +1,10 @@
 # Jibo Auto-Mod Tool
 
+For a portable release with a runnable synthetic conversion review, start with
+the [offline preview guide](Docs/offline-preview.md). That package uses Python
+3.9+ on Windows, macOS and Linux and excludes native binaries/device payloads.
+Its demo opens a local review page; physical apply remains unavailable.
+
 The portable [storage file evidence reader](Docs/storage-file-evidence.md) checks
 Jetstream configuration bytes and credential region inside a pinned offline
 backup. It exports hashes and locations without credential contents. Explicit
