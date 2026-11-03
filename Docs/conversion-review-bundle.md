@@ -104,9 +104,72 @@ outside this check.
 These relations establish byte consistency with an operator-supplied reference.
 They do not establish trustworthy acquisition, freshness, physical association,
 the actual installed release, or that calibration belongs to the robot.
-The Jetstream file's filesystem path and supplied active credentials region are
-**not linked to the storage backup** by this version. That gap is shown in both
-the review page and JSON; matching unrelated hashes cannot fill it.
+With a v1 input, the Jetstream file's filesystem path and supplied active
+credentials region are **not linked to the storage backup**. That gap remains
+explicit in both page and JSON. Use the v2 input below to recompute those byte
+relationships; runtime mount/release association still remains unverified.
+
+## Storage-bound review v2
+
+Use the same command and retained directory, plus `storage-input.json` following
+the [storage file evidence contract](storage-file-evidence.md). Explicitly select
+the two GPT partition names after reviewing retained evidence. Do not infer them
+from extraction folder numbers. The storage manifest must use exactly the same
+full-storage hash/size as the inventory, GPT prefix hash/size and disk sector count
+as the firewall input, and Jetstream hash/size and region as the endpoint input.
+Any mismatch is refused before creating output.
+
+The outer manifest changes to v2 and adds a seventh raw-file pin:
+
+```json
+{
+  "schema": "openjibo.conversion-review-input.v2",
+  "files": {
+    "inventory": "<inventory-file-sha256>",
+    "target": "<target-file-sha256>",
+    "audit": "<audit-file-sha256>",
+    "recoveryFiles": "<recovery-map-file-sha256>",
+    "firewallInput": "<firewall-manifest-file-sha256>",
+    "endpointInput": "<endpoint-manifest-file-sha256>",
+    "storageInput": "<storage-input-file-sha256>"
+  }
+}
+```
+
+The builder resolves the two fixed partition-root files directly through the
+held full-storage descriptor, after the existing recovery checks. It does not
+invoke the standalone CLI or reopen/hash the entire backup for this added check.
+The original recovery checker still separately hashes recovery files. Subsequent
+filesystem reads share the 600-second storage budget, with 8192 requests, 16 MiB
+total and 1 MiB per request. The existing ext4/JSON limits remain unchanged.
+Unsupported filesystem features remain refused; no real release is admitted by
+synthetic fixture success.
+
+The output schema is `openjibo.conversion-review-bundle.v2`. It adds recomputed
+`storage/evidence.json`, its canonical hash, a summary of file hashes/locations
+and matched region, and these explicit statuses:
+
+| Field | Meaning |
+| --- | --- |
+| `storageFileEvidenceRecomputed` | The builder ran the reader on checked backup bytes |
+| `jetstreamBackupBytesMatched` | The partition-root file matches retained configuration exactly |
+| `credentialRegionBackupBytesMatched` | The credential file's region matches the endpoint input |
+| `mountMappingVerified` | Always false; actual runtime mounts remain unverified |
+
+The existing `endpointStoragePathAssociationVerified` and
+`credentialsRegionAssociationVerified` remain false: byte consistency does not
+establish which files the installed runtime actually uses. Physical/release,
+filesystem integrity/ownership, effective routing/TLS/provider and apply/rollback
+claims also remain false. The static page shows the new evidence separately from
+these remaining gates. No positive supplied storage report is accepted as input.
+The v1 input retains six pins, v1 output and its original unverified coverage;
+adding an unversioned extra pin is refused.
+
+The storage component exports hashes and the region, without full credential
+contents or embedded secrets. Existing endpoint before/after payloads can still
+contain private settings from the retained configuration. Keep the whole bundle
+private. A failure at any component or the final storage mutation check prevents
+the terminal `review.json`; partial output must not be used as a completed review.
 
 ## Review the result
 

@@ -7,8 +7,11 @@ hashes, inode/extent locations and the region. It runs with Python 3.9+ on Windo
 macOS and Linux, using only the standard library. It performs no mount, subprocess,
 USB, SSH, network request or device write.
 
-This is a standalone evidence component. It does not change the existing combined
-conversion review contract or remove its path/region coverage gap automatically.
+This can run as a standalone component or through the
+[v2 combined conversion review](conversion-review-bundle.md#storage-bound-review-v2).
+The v2 builder recomputes the checks using its held backup descriptor and binds
+the inventory, GPT and endpoint input pins. The original v1 review keeps its
+path/region coverage gap.
 No real firmware image has been admitted as a supported release by its synthetic
 tests. A successful result proves consistency within operator-pinned bytes.
 

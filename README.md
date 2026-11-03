@@ -3,8 +3,10 @@
 The portable [storage file evidence reader](Docs/storage-file-evidence.md) checks
 Jetstream configuration bytes and credential region inside a pinned offline
 backup. It exports hashes and locations without credential contents. Explicit
-partition selection, real mount/release evidence and conversion review integration
-remain separate; it performs no device operation.
+partition selection and real mount/release evidence remain separate; it performs
+no device operation. The [v2 combined review](Docs/conversion-review-bundle.md#storage-bound-review-v2)
+now recomputes these checks in the same command as recovery, GPT, firewall and
+endpoint previews, with matching pins across every component.
 
 **Automatically enable developer mode on Jibo robots**
 
