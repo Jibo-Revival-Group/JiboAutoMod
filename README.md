@@ -25,6 +25,12 @@ bundles without execution, or explicitly supervises the dedicated read-only host
 with deadlines and evidence receipts. Tests use synthetic processes/USB stubs;
 reviewed real bundles, device windows and hardware/recovery acceptance remain.
 
+[Capture candidate preparation](Docs/capture-candidate.md) joins a Windows static
+DLL export and an actual ARM payload from the same CI revision into a pinned,
+fixed review plan. It launches no native process. A separate offline receipt
+auditor joins a later completed capture to the primary GPT checks. Both preserve
+the outstanding physical identity, runtime compatibility and recovery limits.
+
 ## Current Dev entry points
 
 Start with the [host support matrix](Docs/host-support.md) for this branch.
