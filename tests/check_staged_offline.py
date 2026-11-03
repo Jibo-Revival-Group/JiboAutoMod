@@ -11,7 +11,7 @@ def main():
     parser.add_argument('--root', required=True, type=Path)
     root = parser.parse_args().root.absolute()
     scripts = ('conversion_plan.py', 'recovery_evidence.py', 'gpt_audit.py', 'capture_adapter.py', 'capture_bundle.py', 'capture_audit.py', 'firewall_preview.py', 'endpoint_preview.py', 'conversion_review.py')
-    required = (*scripts, 'gpt_layout.py', 'capture_process.py', 'Docs/conversion-preparation.md', 'Docs/conversion-review-bundle.md',
+    required = (*scripts, 'gpt_layout.py', 'capture_process.py', 'Docs/capture-process-cleanup.md', 'Docs/conversion-preparation.md', 'Docs/conversion-review-bundle.md',
                 'pe_imports.py', 'ext4_path.py', 'firewall_patch.py', 'profiles/S21firewall.v1', 'Docs/firewall-sector-preview.md', 'Docs/endpoint-file-preview.md',
                 'Docs/recovery-file-check.md', 'Docs/primary-gpt-audit.md', 'Docs/bounded-capture-adapter.md', 'Docs/capture-candidate.md')
     if not all((root/name).is_file() for name in required):

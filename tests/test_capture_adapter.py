@@ -102,9 +102,25 @@ class CaptureAdapter(unittest.TestCase):
 
     def test_diagnostic_flood_is_bounded_and_contents_are_discarded(self):
         value=self.capture('diagnostic-limit')
-        self.assertEqual('diagnostic-limit',value['outcome']); self.assertFalse(value['captureCompleted'])
+        details=dict(captureDispatchAttempted=value['captureDispatchAttempted'],
+                     processes=[dict(exitCode=p.get('exitCode'),systemError=p.get('systemError'),cleanup=p.get('cleanup')) for p in value['processes']])
+        self.assertEqual('diagnostic-limit',value['outcome'],json.dumps(details)); self.assertFalse(value['captureCompleted'])
         self.assertNotIn('DO_NOT_ECHO',json.dumps(value)); self.assertFalse(value['processes'][-1]['stderr']['rawDiagnosticsRetained'])
         self.assertLessEqual(value['processes'][-1]['stderr']['observedBytes'],8193)
+
+    def test_cleanup_failure_does_not_admit_full_output_or_retry(self):
+        original=A.N.cleanup; calls=[]
+        def fail_read_cleanup(*args):
+            result=original(*args); calls.append(1)
+            if len(calls)==2:
+                result['errors'].append('injected-cleanup-failure'); result['checksPassed']=False
+            return result
+        with patch.object(A.N,'cleanup',side_effect=fail_read_cleanup): value=self.capture()
+        self.assertEqual(value['outcome'],'process-cleanup-failed'); self.assertFalse(value['captureCompleted'])
+        self.assertTrue(value['captureDispatchAttempted']); self.assertEqual(len(calls),2)
+        self.assertEqual((self.output/'work/capture.bin').stat().st_size,34*512)
+        self.assertFalse((self.output/'capture.bin').exists())
+        self.assertFalse(value['processes'][-1]['cleanup']['checksPassed'])
 
     def test_whole_budget_includes_capabilities_and_read_process(self):
         self.plan['timeoutSeconds']=1

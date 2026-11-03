@@ -18,13 +18,23 @@ jobs:
         with:
           python-version: '3.9'
       - name: Validate preparation and retained recovery file checks without device access
+        shell: pwsh
         run: |
-          python -B -m unittest discover -s tests -p test_conversion_plan.py
-          python -B -m unittest discover -s tests -p test_recovery_evidence.py
-          python -B -m unittest discover -s tests -p test_gpt_audit.py
-          python -B -m unittest discover -s tests -p test_capture_adapter.py
-          python -B -m unittest discover -s tests -p test_capture_bundle.py
-          python -B -m unittest discover -s tests -p test_capture_audit.py
-          python -B -m unittest discover -s tests -p test_firewall_preview.py
-          python -B -m unittest discover -s tests -p test_endpoint_preview.py
-          python -B -m unittest discover -s tests -p test_conversion_review.py
+          $contracts = @('test_conversion_plan.py', 'test_recovery_evidence.py', 'test_gpt_audit.py', 'test_capture_adapter.py', 'test_capture_process.py', 'test_capture_bundle.py', 'test_capture_audit.py', 'test_firewall_preview.py', 'test_endpoint_preview.py', 'test_conversion_review.py')
+          foreach ($contract in $contracts) {
+            python -B -m unittest discover -s tests -p $contract
+            if ($LASTEXITCODE -ne 0) { throw "Compatibility contract failed: $contract" }
+          }
+      - name: Stress bounded Python process cleanup without hardware
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          python -I -B tests/check_capture_process_stress.py --output "$env:RUNNER_TEMP/capture-process-stress" --source-revision '${{ github.sha }}'
+          if ($LASTEXITCODE -ne 0) { throw 'Synthetic process stress failed.' }
+      - name: Retain synthetic process stress evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CaptureProcessStress-${{ runner.os }}-${{ github.sha }}
+          path: ${{ runner.temp }}/capture-process-stress
+          if-no-files-found: warn

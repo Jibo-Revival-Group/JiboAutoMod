@@ -48,6 +48,7 @@ def main():
         assert json.loads(launched.stdout)['captureCompleted'] is True and str(work) not in launched.stdout
         receipt=json.loads((output/'receipt.json').read_bytes())
         assert receipt['captureCompleted'],receipt['outcome']
+        assert len(receipt['processes'])==2 and all(p['cleanup']['checksPassed'] and p['cleanup']['parentReaped'] and p['cleanup']['drainsFinished'] for p in receipt['processes'])
         assert receipt['readyForApply'] is False and receipt['deviceIdentityVerified'] is False and receipt['resetVerified'] is False
         assert (output/'capture.bin').read_bytes()==b'\x5A'*(count*512)
         receipts.append(dict(kind=kind,receiptSha256=adapter.P.digest(receipt),captureCompleted=True,readyForApply=False))
