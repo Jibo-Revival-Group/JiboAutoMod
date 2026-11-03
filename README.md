@@ -18,7 +18,12 @@ paths and keeps robot association, restoration and apply readiness unverified.
 
 The [primary GPT audit](Docs/primary-gpt-audit.md) checks retained partition-table
 evidence without device access. It reports geometry/profile limits explicitly;
-native capture and exact-change conversion preview remain to be integrated.
+real native capture acceptance and exact-change conversion preview remain.
+
+The [bounded capture adapter](Docs/bounded-capture-adapter.md) now inspects pinned
+bundles without execution, or explicitly supervises the dedicated read-only host
+with deadlines and evidence receipts. Tests use synthetic processes/USB stubs;
+reviewed real bundles, device windows and hardware/recovery acceptance remain.
 
 ## Current Dev entry points
 

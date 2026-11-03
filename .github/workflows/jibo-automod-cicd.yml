@@ -98,6 +98,8 @@ jobs:
           $hostName = if ($IsWindows) { 'shofel2_t124_readonly.exe' } else { 'shofel2_t124_readonly' }
           python -I -B tests/check_readonly_native.py --compiler $compiler --output "$env:RUNNER_TEMP/readonly-native-contract" --real-host "Exploits/Shofel/$hostName"
           if ($LASTEXITCODE -ne 0) { throw 'Read-only native contract failed.' }
+          python -I -B tests/check_capture_adapter_native.py --fixture "$env:RUNNER_TEMP/readonly-native-contract"
+          if ($LASTEXITCODE -ne 0) { throw 'Bounded capture adapter native integration failed.' }
 
       - name: Upload read-only compiler and fixture evidence
         uses: actions/upload-artifact@v4
@@ -111,7 +113,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path publish -Force | Out-Null
-          Copy-Item JiboModTool.py,conversion_plan.py,recovery_evidence.py,gpt_audit.py,gpt_layout.py,config.py,firewall_patch.py,ext4_path.py,diagnose_firewall_cache.py,requirements.txt,README.md -Destination publish
+          Copy-Item JiboModTool.py,conversion_plan.py,recovery_evidence.py,gpt_audit.py,gpt_layout.py,capture_adapter.py,capture_process.py,config.py,firewall_patch.py,ext4_path.py,diagnose_firewall_cache.py,requirements.txt,README.md -Destination publish
           Copy-Item Docs,Exploits,profiles -Destination publish -Recurse
 
       - name: Verify staged offline entry points and dependencies

@@ -97,3 +97,8 @@ Evidence stores compiled components in `built-components/` and source copies in
 `reviewed-source/`. Dummy protocol files used by the USB fixture are isolated in
 `usb-fixture/`; they are not payloads for device use. Proof hashes identify each
 relative path, including the real built host and, on Linux/macOS, payload/bootstrap.
+
+The separate [bounded capture adapter](bounded-capture-adapter.md) now adds
+component pin checks, fixed plans, process deadlines, cancellation and terminal
+receipts. Its native CI path uses the compiled USB-stub host; no hardware
+acceptance or artifact authority is implied by either layer.
