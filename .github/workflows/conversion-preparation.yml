@@ -20,7 +20,7 @@ jobs:
       - name: Validate preparation and retained recovery file checks without device access
         shell: pwsh
         run: |
-          $contracts = @('test_conversion_plan.py', 'test_recovery_evidence.py', 'test_gpt_audit.py', 'test_capture_adapter.py', 'test_capture_process.py', 'test_capture_bundle.py', 'test_capture_audit.py', 'test_firewall_preview.py', 'test_endpoint_preview.py', 'test_conversion_review.py')
+          $contracts = @('test_conversion_plan.py', 'test_recovery_evidence.py', 'test_gpt_audit.py', 'test_capture_adapter.py', 'test_capture_process.py', 'test_capture_bundle.py', 'test_capture_audit.py', 'test_firewall_preview.py', 'test_endpoint_preview.py', 'test_conversion_review.py', 'test_storage_evidence.py')
           foreach ($contract in $contracts) {
             python -B -m unittest discover -s tests -p $contract
             if ($LASTEXITCODE -ne 0) { throw "Compatibility contract failed: $contract" }
