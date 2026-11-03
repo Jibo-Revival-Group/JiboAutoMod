@@ -21,14 +21,19 @@ def main():
     import test_conversion_review as fixture
     import test_conversion_review_storage as storage_fixture
     records=[]
-    for name in ('managed-https','isolated-http','storage-managed-https','storage-isolated-http'):
-        with_storage=name.startswith('storage-')
+    for name in ('managed-https','isolated-http','storage-managed-https','storage-isolated-http','request-managed-https','request-isolated-http'):
+        request_mode=name.startswith('request-')
+        with_storage=name.startswith(('storage-','request-'))
         case=root/name; case.mkdir(); inputs=case/'inputs'
         values=(storage_fixture.fixture if with_storage else fixture.fixture)(inputs,isolated=name.endswith('isolated-http'))
         manifest=case/'review-input.json'; pin=fixture.write_inputs(inputs,values,manifest)
+        if request_mode: (inputs/'storage-input.json').unlink()
         before={p.name:sha(p) for p in inputs.iterdir()}
-        result=subprocess.run([sys.executable,'-I','-B',str(tool/'conversion_review.py'),'--manifest',str(manifest),
-                               '--manifest-sha256',pin,'--inputs',str(inputs),'--output',str(case/'result')],
+        command=([sys.executable,'-I','-B',str(tool/'review_request.py'),'--inputs',str(inputs),'--output',str(case/'result'),
+                  '--jetstream-partition','services-test','--credentials-partition','var-test'] if request_mode else
+                 [sys.executable,'-I','-B',str(tool/'conversion_review.py'),'--manifest',str(manifest),
+                  '--manifest-sha256',pin,'--inputs',str(inputs),'--output',str(case/'result')])
+        result=subprocess.run(command,
                               cwd=root,capture_output=True,text=True,timeout=30)
         assert result.returncode==0,result.stderr
         assert str(root) not in result.stdout+result.stderr and 'PRIVATE_INPUT_FIXTURE' not in result.stdout+result.stderr
@@ -36,6 +41,7 @@ def main():
         assert summary['reviewAssembled'] and not summary['completeConversionPlan'] and not summary['readyForApply']
         assert review['reviewAssembled'] and review['manifestSha256']==pin
         assert review['schema']=='openjibo.conversion-review-bundle.'+('v2' if with_storage else 'v1')
+        assert review['inputPinOrigin']==('generated-from-supplied-files' if request_mode else 'externally-supplied-manifest-pin')
         assert before=={p.name:sha(p) for p in inputs.iterdir()}
         assert review['inventoryCanonicalSha256']==fixture.V.P.digest(values['inventory'])
         assert review['targetCanonicalSha256']==fixture.V.P.digest(values['target']) and review['target']==values['target']
@@ -80,10 +86,14 @@ def main():
                              ('firewall','firewall_preview.py'),('endpoint','endpoint_preview.py'),('gptAuditor','gpt_audit.py')]:
             assert review['codeSha256'][key]==sha(tool/filename)
         if with_storage: assert review['codeSha256']['storageEvidence']==sha(tool/'storage_evidence.py')
+        if request_mode:
+            assert review['codeSha256']['requestBuilder']==sha(tool/'review_request.py')
+            assert sha(case/'result/request/review-input.json')==pin
+            assert sha(case/'result/request/storage-input.json')==review['inputFilePins']['storageInput']
         records.append(dict(case=name,reviewFile=name+'/result/review.json',reviewSha256=sha(case/'result/review.json'),readyForApply=False))
     copied=root/'reviewed-source'; copied.mkdir()
     for name in ('conversion_review.py','conversion_plan.py','recovery_evidence.py','gpt_audit.py','gpt_layout.py','firewall_preview.py','firewall_patch.py','ext4_path.py',
-                 'endpoint_preview.py','storage_evidence.py','capture_bundle.py','capture_adapter.py','capture_process.py','pe_imports.py'):
+                 'endpoint_preview.py','storage_evidence.py','review_request.py','capture_bundle.py','capture_adapter.py','capture_process.py','pe_imports.py'):
         shutil.copyfile(tool/name,copied/name)
     shutil.copyfile(tool/'profiles/S21firewall.v1',copied/'S21firewall.v1')
     files=[dict(file=p.relative_to(root).as_posix(),sha256=sha(p),sizeBytes=p.stat().st_size) for p in sorted(root.rglob('*')) if p.is_file()]

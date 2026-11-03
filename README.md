@@ -7,6 +7,9 @@ partition selection and real mount/release evidence remain separate; it performs
 no device operation. The [v2 combined review](Docs/conversion-review-bundle.md#storage-bound-review-v2)
 now recomputes these checks in the same command as recovery, GPT, firewall and
 endpoint previews, with matching pins across every component.
+For retained inputs that are already prepared, `review_request.py` generates the
+storage/outer manifests and builds that review in one command, with explicit
+partition choices and preserved pins. See the [one-command flow](Docs/conversion-review-bundle.md#one-command-request-and-review).
 
 **Automatically enable developer mode on Jibo robots**
 

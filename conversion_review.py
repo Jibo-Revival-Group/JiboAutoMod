@@ -111,6 +111,8 @@ def render(review):
     missing=''.join('<li>'+esc(item)+'</li>' for item in gates)
     records=[('preparation.json','Preparation'),('recovery.json','Retained recovery checks'),('gpt-audit.json','Recomputed GPT audit'),
              ('firewall/preview.json','Firewall sector preview'),('endpoint/preview.json','Endpoint file preview'),('review.json','Bundle record and file hashes')]
+    if review.get('inputPinOrigin')=='generated-from-supplied-files':
+        records.extend([('request/review-input.json','Generated review input pins'),('request/storage-input.json','Generated storage input')])
     storage_section=''
     if review.get('storageFileEvidenceRecomputed'):
         records.append(('storage/evidence.json','Recomputed storage file evidence'))
@@ -136,16 +138,24 @@ def render(review):
             +storage_section+'<section><h2>Still required before apply</h2><ul>'+missing+'</ul></section><section><h2>Component records</h2><ul>'+links+'</ul></section></html>').encode('utf-8')
 
 
-def build(manifest_path,manifest_pin,inputs,output):
+def build(manifest_path,manifest_pin,inputs,output,storage_input=None):
     manifest,_=E.read_json(manifest_path,manifest_pin)
     P.exact(manifest,('schema','files'),'review_input_fields')
     require(manifest['schema'] in ('openjibo.conversion-review-input.v1','openjibo.conversion-review-input.v2'))
     with_storage=manifest['schema']=='openjibo.conversion-review-input.v2'
     input_names=INPUTS_V2 if with_storage else INPUTS
     P.exact(manifest['files'],input_names,'review_pin_fields')
+    require(storage_input is None or with_storage)
     inputs=R.ordinary_path(inputs); require(inputs.is_dir())
+    values={name:E.read_json(storage_input if name=='storageInput' and storage_input is not None else inputs/filename,manifest['files'][name])[0]
+            for name,filename in input_names.items()}
+    return _assemble(manifest,manifest_pin,values,inputs,output)
+
+
+def _assemble(manifest,manifest_pin,values,inputs,output,request_files=None):
+    """Internal orchestration for pinned-file and generated-request entry points."""
+    with_storage=manifest['schema']=='openjibo.conversion-review-input.v2'
     output=Path(output).absolute(); R.ordinary_path(output.parent); require(not output.exists())
-    values={name:E.read_json(inputs/filename,manifest['files'][name])[0] for name,filename in input_names.items()}
     inventory=values['inventory']; target=values['target']; firewall=values['firewallInput']; endpoint=values['endpointInput']
     preparation=P.plan(inventory,target); F.validate(firewall)
     require(inventory['auditEvidenceSha256']==manifest['files']['audit'])
@@ -164,6 +174,11 @@ def build(manifest_path,manifest_pin,inputs,output):
         if with_storage:
             storage_result=S.inspect_reader(storage,manifest['files']['storageInput'],B.read(inputs/'jetstream.json',P.LIMIT),read_at)
         B.new_directory(output)
+        if request_files:
+            require(set(request_files)=={'review-input.json','storage-input.json'})
+            require(sha(request_files['review-input.json'])==manifest_pin and sha(request_files['storage-input.json'])==manifest['files']['storageInput'])
+            B.new_directory(output/'request')
+            for name,raw in request_files.items(): B.write(output/'request'/name,raw)
         if storage_result:
             B.new_directory(output/'storage'); P.export(storage_result,output/'storage/evidence.json')
         firewall_result=F.preview(inputs/INPUTS['firewallInput'],manifest['files']['firewallInput'],inputs,output/'firewall')
@@ -176,6 +191,7 @@ def build(manifest_path,manifest_pin,inputs,output):
                                storage_gates+['calibration-and-storage-acquisition-to-physical-device-unverified','backup-gpt-and-protective-mbr-unverified']))
     review=dict(schema='openjibo.conversion-review-bundle.v2' if with_storage else 'openjibo.conversion-review-bundle.v1',checkedAtUtc=datetime.now(timezone.utc).isoformat(),
                 manifestSha256=manifest_pin,manifestCanonicalSha256=P.digest(manifest),inputFilePins=manifest['files'],
+                inputPinOrigin='generated-from-supplied-files' if request_files else 'externally-supplied-manifest-pin',
                 inventoryCanonicalSha256=P.digest(inventory),targetCanonicalSha256=P.digest(target),target=target,hubOrigin=endpoint['hubOrigin'],
                 suppliedDeviceReferenceSha256=inventory['deviceFingerprintSha256'],suppliedReleaseFamily=inventory['releaseFamily'],
                 inventoryAuditReferenceMatched=True,recoveryFilesMatchedInventory=True,storageByteRelationships=bindings,
@@ -199,6 +215,7 @@ def build(manifest_path,manifest_pin,inputs,output):
                 codeSha256=dict(builder=sha(Path(__file__).read_bytes()),preparation=sha(Path(P.__file__).read_bytes()),
                     recovery=sha(Path(R.__file__).read_bytes()),firewall=sha(Path(F.__file__).read_bytes()),endpoint=sha(Path(E.__file__).read_bytes()),gptAuditor=sha(Path(G.__file__).read_bytes())))
     if storage_result: review['codeSha256']['storageEvidence']=sha(Path(S.__file__).read_bytes())
+    if request_files: review['codeSha256']['requestBuilder']=sha(Path(__file__).with_name('review_request.py').read_bytes())
     B.write(output/'review.html',render(review))
     review['files']=[dict(file=path.relative_to(output).as_posix(),sizeBytes=path.stat().st_size,sha256=sha(B.read(path))) for path in sorted(output.rglob('*')) if path.is_file()]
     require(len(review['files'])<=32 and len(P.canonical(review))<P.LIMIT)
@@ -211,8 +228,9 @@ def main():
     parser=Parser(description=__doc__)
     for name in ('manifest','inputs','output'): parser.add_argument('--'+name,required=True,type=Path)
     parser.add_argument('--manifest-sha256',required=True)
+    parser.add_argument('--storage-input',type=Path,help='Optional v2 storage manifest location; its pinned bytes are still required.')
     args=parser.parse_args()
-    try: result=build(args.manifest,args.manifest_sha256,args.inputs,args.output)
+    try: result=build(args.manifest,args.manifest_sha256,args.inputs,args.output,args.storage_input)
     except (ValueError,OSError,UnicodeError,KeyError,TypeError,F.E.Ext4PathError,S.F.E.Ext4PathError,F.F.FirewallPatchError,F.A.CaptureFailure,B.A.CaptureFailure,RecursionError):
         parser.exit(2,'Conversion review refused; check pinned inputs, shared backup bytes, supported profiles and new output.\n')
     print(json.dumps(dict(reviewAssembled=True,reviewSha256=P.digest(result),completeConversionPlan=False,readyForApply=False)))

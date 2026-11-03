@@ -12,6 +12,43 @@ components, not a complete conversion plan. `reviewAssembled` is an export
 status. `completeConversionPlan`, `executionSupported` and `readyForApply`
 always remain false.
 
+## One-command request and review
+
+When the retained files and six original component JSON inputs below are already
+prepared, `review_request.py` generates the seventh storage manifest and all
+outer pins, then runs the v2 review. It needs no pre-existing `storage-input.json`
+or outer review manifest, and does not modify the retained directory. Explicit
+partition selection is required; the names below are placeholders, not defaults.
+
+Windows:
+
+```powershell
+py -3 review_request.py --inputs C:\review\retained --output C:\review\new-review `
+  --jetstream-partition <exact-config-partition> --credentials-partition <exact-credential-partition>
+```
+
+macOS/Linux:
+
+```bash
+python3 review_request.py --inputs /review/retained --output /review/new-review \
+  --jetstream-partition <exact-config-partition> --credentials-partition <exact-credential-partition>
+```
+
+Open the resulting `review.html`. The indexed `request/review-input.json` and
+`request/storage-input.json` preserve generated raw-file pins. Stdout contains
+the manifest and canonical review hashes. `inputPinOrigin` explicitly records
+`generated-from-supplied-files`; generating hashes is not prior human approval or
+proof of provenance. The original inventory audit reference and endpoint target
+reference must already match their actual supplied files. This command does not
+invent device identity, acquire missing backups, produce component inputs, guess
+partitions, enroll a provider or apply changes.
+
+For a separately reviewed pinned replay, use `conversion_review.py` with the
+generated outer manifest, its reviewed `--manifest-sha256`, original `--inputs`,
+a new `--output`, and `--storage-input` pointing to the generated storage manifest.
+That optional location override is v2-only and still requires the exact pinned
+file bytes. Input pin origin is then `externally-supplied-manifest-pin`.
+
 ## Fixed retained input directory
 
 Prepare these ordinary local files using the existing component contracts:
