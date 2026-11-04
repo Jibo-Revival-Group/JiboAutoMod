@@ -1,5 +1,12 @@
 # Jibo Auto-Mod Tool
 
+The optional [full-backup recovery-table audit](Docs/gpt-recovery-audit.md)
+now checks the protective MBR, both GPT headers and matching entry arrays.
+Use `review_request.py --gpt-recovery` for a v3 combined review. The checks are
+read-only and scoped to pinned backup bytes; physical association, filesystem
+integrity, restoration and apply remain unverified. The updated portable demo
+exercises this profile with synthetic storage.
+
 The [pre-provisioning storage intake](Docs/oobe-storage-intake.md) now distinguishes
 absent, empty, blank and partial credential observations without assigning a
 region or changing the credentialed review's requirements. It is read-only and

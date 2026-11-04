@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate pinned inputs and build a v2 offline conversion review in one command."""
+"""Generate pinned inputs and build a v2 or optional v3 offline conversion review."""
 import argparse
 import json
 from pathlib import Path
@@ -10,7 +10,8 @@ spec=importlib.util.spec_from_file_location('conversion_review',Path(__file__).w
 V=importlib.util.module_from_spec(spec); spec.loader.exec_module(V)
 
 
-def build(inputs,output,jetstream_partition,credentials_partition):
+def build(inputs,output,jetstream_partition,credentials_partition,gpt_recovery=False):
+    V.require(type(gpt_recovery) is bool)
     inputs=V.R.ordinary_path(inputs); V.require(inputs.is_dir())
     values={}; pins={}
     for name,filename in V.INPUTS.items():
@@ -29,7 +30,7 @@ def build(inputs,output,jetstream_partition,credentials_partition):
     V.S.validate(storage)
     storage_raw=V.P.canonical(storage)+b'\n'
     pins['storageInput']=V.sha(storage_raw); values['storageInput']=storage
-    manifest=dict(schema='openjibo.conversion-review-input.v2',files=pins)
+    manifest=dict(schema='openjibo.conversion-review-input.v3' if gpt_recovery else 'openjibo.conversion-review-input.v2',files=pins)
     manifest_raw=V.P.canonical(manifest)+b'\n'
     return V._assemble(manifest,V.sha(manifest_raw),values,inputs,output,
                        request_files={'review-input.json':manifest_raw,'storage-input.json':storage_raw})
@@ -41,8 +42,9 @@ def main():
     parser=Parser(description=__doc__)
     for name in ('inputs','output'): parser.add_argument('--'+name,required=True,type=Path)
     for name in ('jetstream-partition','credentials-partition'): parser.add_argument('--'+name,required=True)
+    parser.add_argument('--gpt-recovery',action='store_true',help='Build v3 and require protective MBR and both GPT copies to match the pinned backup.')
     args=parser.parse_args()
-    try: result=build(args.inputs,args.output,args.jetstream_partition,args.credentials_partition)
+    try: result=build(args.inputs,args.output,args.jetstream_partition,args.credentials_partition,args.gpt_recovery)
     except (ValueError,OSError,UnicodeError,KeyError,TypeError,V.F.E.Ext4PathError,V.S.F.E.Ext4PathError,
             V.F.F.FirewallPatchError,V.F.A.CaptureFailure,V.B.A.CaptureFailure,RecursionError):
         parser.exit(2,'Review request refused; check retained inputs, explicit partition selection and new output. No complete review was exported.\n')

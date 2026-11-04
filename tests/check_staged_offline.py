@@ -10,10 +10,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', required=True, type=Path)
     root = parser.parse_args().root.absolute()
-    scripts = ('conversion_plan.py', 'recovery_evidence.py', 'gpt_audit.py', 'capture_adapter.py', 'capture_bundle.py', 'capture_audit.py', 'firewall_preview.py', 'endpoint_preview.py', 'conversion_review.py', 'storage_evidence.py', 'oobe_intake.py', 'review_request.py')
+    scripts = ('conversion_plan.py', 'recovery_evidence.py', 'gpt_audit.py', 'gpt_recovery.py', 'capture_adapter.py', 'capture_bundle.py', 'capture_audit.py', 'firewall_preview.py', 'endpoint_preview.py', 'conversion_review.py', 'storage_evidence.py', 'oobe_intake.py', 'review_request.py')
     required = (*scripts, 'gpt_layout.py', 'capture_process.py', 'Docs/oobe-storage-intake.md', 'Docs/storage-file-evidence.md', 'Docs/capture-process-cleanup.md', 'Docs/conversion-preparation.md', 'Docs/conversion-review-bundle.md',
                 'pe_imports.py', 'ext4_path.py', 'firewall_patch.py', 'profiles/S21firewall.v1', 'Docs/firewall-sector-preview.md', 'Docs/endpoint-file-preview.md',
-                'Docs/recovery-file-check.md', 'Docs/primary-gpt-audit.md', 'Docs/bounded-capture-adapter.md', 'Docs/capture-candidate.md')
+                'Docs/recovery-file-check.md', 'Docs/primary-gpt-audit.md', 'Docs/gpt-recovery-audit.md', 'Docs/bounded-capture-adapter.md', 'Docs/capture-candidate.md')
     if not all((root/name).is_file() for name in required):
         raise SystemExit('Staged offline package is incomplete.')
     with tempfile.TemporaryDirectory() as other:

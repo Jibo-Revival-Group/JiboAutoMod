@@ -37,7 +37,7 @@ def main():
         if args.oobe_intake:
             manifest=inputs/'intake-input.json'
             result=module.inspect(manifest,module.F.sha(module.B.read(manifest,module.P.LIMIT)),inputs,output,synthetic_demo=True)
-        else: result=module.build(inputs,output,'services-test','var-test')
+        else: result=module.build(inputs,output,'services-test','var-test',gpt_recovery=True)
     except errors:
         parser.exit(2,'Synthetic demo refused; check extracted files and a new writable output directory.\n')
     page=Path(output).absolute()/('intake.html' if args.oobe_intake else 'review.html')
