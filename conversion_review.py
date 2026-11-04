@@ -22,6 +22,7 @@ E=sibling('endpoint_preview')
 F=sibling('firewall_preview')
 G=sibling('gpt_audit')
 S=sibling('storage_evidence')
+H=sibling('gpt_recovery')
 B=E.B; P=B.P; R=B.A.R
 INPUTS=dict(inventory='inventory.json',target='target.json',audit='audit.json',recoveryFiles='recovery-files.json',
             firewallInput='firewall-input.json',endpointInput='endpoint-input.json')
@@ -103,7 +104,8 @@ def render(review):
     gates=['Confirm the backup, calibration data and installed release belong to the intended robot.',
            ('Verify runtime mount mapping and the installed release for the matched storage files.' if review.get('storageFileEvidenceRecomputed') else
             'Resolve the Jetstream file path and active credentials region from retained storage.'),
-           'Complete filesystem, allocation, backup GPT and protective MBR checks.',
+           ('Complete filesystem integrity and allocation checks.' if review.get('gptRecoveryEvidenceRecomputed') else
+            'Complete filesystem, allocation, backup GPT and protective MBR checks.'),
            'Plan native token, notification, SSM and DNS changes for the selected target.',
            'Verify effective API/Hub protocols, certificate chains and the robot trust store.',
            'Review the complete conversion and validate confirmed apply, readback and rollback.']
@@ -114,6 +116,8 @@ def render(review):
     if review.get('inputPinOrigin')=='generated-from-supplied-files':
         records.extend([('request/review-input.json','Generated review input pins'),('request/storage-input.json','Generated storage input')])
     storage_section=''
+    if review.get('gptRecoveryEvidenceRecomputed'):
+        records.append(('gpt-recovery.json','Recomputed backup GPT and protective MBR checks'))
     if review.get('storageFileEvidenceRecomputed'):
         records.append(('storage/evidence.json','Recomputed storage file evidence'))
         evidence=review['storageFileSummary']
@@ -141,8 +145,8 @@ def render(review):
 def build(manifest_path,manifest_pin,inputs,output,storage_input=None):
     manifest,_=E.read_json(manifest_path,manifest_pin)
     P.exact(manifest,('schema','files'),'review_input_fields')
-    require(manifest['schema'] in ('openjibo.conversion-review-input.v1','openjibo.conversion-review-input.v2'))
-    with_storage=manifest['schema']=='openjibo.conversion-review-input.v2'
+    require(manifest['schema'] in ('openjibo.conversion-review-input.v1','openjibo.conversion-review-input.v2','openjibo.conversion-review-input.v3'))
+    with_storage=manifest['schema']!='openjibo.conversion-review-input.v1'
     input_names=INPUTS_V2 if with_storage else INPUTS
     P.exact(manifest['files'],input_names,'review_pin_fields')
     require(storage_input is None or with_storage)
@@ -154,13 +158,14 @@ def build(manifest_path,manifest_pin,inputs,output,storage_input=None):
 
 def _assemble(manifest,manifest_pin,values,inputs,output,request_files=None):
     """Internal orchestration for pinned-file and generated-request entry points."""
-    with_storage=manifest['schema']=='openjibo.conversion-review-input.v2'
+    with_gpt=manifest['schema']=='openjibo.conversion-review-input.v3'
+    with_storage=manifest['schema'] in ('openjibo.conversion-review-input.v2','openjibo.conversion-review-input.v3')
     output=Path(output).absolute(); R.ordinary_path(output.parent); require(not output.exists())
     inventory=values['inventory']; target=values['target']; firewall=values['firewallInput']; endpoint=values['endpointInput']
     preparation=P.plan(inventory,target); F.validate(firewall)
     require(inventory['auditEvidenceSha256']==manifest['files']['audit'])
     require(endpoint.get('targetSha256')==manifest['files']['target'])
-    storage_result=None
+    storage_result=None; gpt_result=None
     if with_storage:
         storage=values['storageInput']; S.validate(storage)
         full=next((item for item in inventory['backups'] if item['kind']=='full-storage'),None)
@@ -173,6 +178,9 @@ def _assemble(manifest,manifest_pin,values,inputs,output,request_files=None):
     with checked_storage(inventory,values['recoveryFiles'],inputs,firewall,actual_audit['layout']) as (recovery,bindings,read_at):
         if with_storage:
             storage_result=S.inspect_reader(storage,manifest['files']['storageInput'],B.read(inputs/'jetstream.json',P.LIMIT),read_at)
+        if with_gpt:
+            gpt_result=H.audit_reader(read_at,firewall['diskSectors'])
+            gpt_result['fullStorage']=storage['fullStorage']
         B.new_directory(output)
         if request_files:
             require(set(request_files)=={'review-input.json','storage-input.json'})
@@ -181,6 +189,7 @@ def _assemble(manifest,manifest_pin,values,inputs,output,request_files=None):
             for name,raw in request_files.items(): B.write(output/'request'/name,raw)
         if storage_result:
             B.new_directory(output/'storage'); P.export(storage_result,output/'storage/evidence.json')
+        if gpt_result: P.export(gpt_result,output/'gpt-recovery.json')
         firewall_result=F.preview(inputs/INPUTS['firewallInput'],manifest['files']['firewallInput'],inputs,output/'firewall')
         endpoint_result=E.preview(inputs/INPUTS['endpointInput'],manifest['files']['endpointInput'],inputs/INPUTS['target'],manifest['files']['target'],inputs/'jetstream.json',output/'endpoint')
         require(firewall_result['layout']==actual_audit['layout'] and endpoint_result['targetCanonicalSha256']==preparation['targetSha256'])
@@ -188,8 +197,9 @@ def _assemble(manifest,manifest_pin,values,inputs,output,request_files=None):
     storage_gates=(storage_result['requiredBeforeApply'] if storage_result else ['jetstream-filesystem-path-and-credentials-region-to-backup-unverified'])
     blockers=list(dict.fromkeys(preparation['requiredBeforeApply']+preparation['preparationBlockers']+
                                firewall_result['requiredBeforeApply']+endpoint_result['requiredBeforeApply']+
-                               storage_gates+['calibration-and-storage-acquisition-to-physical-device-unverified','backup-gpt-and-protective-mbr-unverified']))
-    review=dict(schema='openjibo.conversion-review-bundle.v2' if with_storage else 'openjibo.conversion-review-bundle.v1',checkedAtUtc=datetime.now(timezone.utc).isoformat(),
+                               storage_gates+['calibration-and-storage-acquisition-to-physical-device-unverified']+
+                               ([] if gpt_result else ['backup-gpt-and-protective-mbr-unverified'])))
+    review=dict(schema='openjibo.conversion-review-bundle.v3' if with_gpt else 'openjibo.conversion-review-bundle.v2' if with_storage else 'openjibo.conversion-review-bundle.v1',checkedAtUtc=datetime.now(timezone.utc).isoformat(),
                 manifestSha256=manifest_pin,manifestCanonicalSha256=P.digest(manifest),inputFilePins=manifest['files'],
                 inputPinOrigin='generated-from-supplied-files' if request_files else 'externally-supplied-manifest-pin',
                 inventoryCanonicalSha256=P.digest(inventory),targetCanonicalSha256=P.digest(target),target=target,hubOrigin=endpoint['hubOrigin'],
@@ -200,7 +210,7 @@ def _assemble(manifest,manifest_pin,values,inputs,output,request_files=None):
                 mountMappingVerified=False,storageEvidenceCanonicalSha256=P.digest(storage_result) if storage_result else None,
                 storageFileSummary=dict(credentialsRegion=storage_result['credentialsRegion'],files=storage_result['files']) if storage_result else None,
                 physicalDeviceAssociationVerified=False,releaseCompatibilityVerified=False,calibrationDeviceAssociationVerified=False,
-                completeFilesystemIntegrityVerified=False,restoreTested=False,backupGptVerified=False,protectiveMbrVerified=False,
+                completeFilesystemIntegrityVerified=False,restoreTested=False,backupGptVerified=bool(gpt_result),protectiveMbrVerified=bool(gpt_result),
                 proposedFirewallSectors=firewall_result['proposedChangedSectors'],firewallOperation=firewall_result['operation'],endpointChangeRequired=endpoint_result['changeRequired'],
                 coverage={'Preparation':'Supplied fields complete' if preparation['suppliedPreparationFieldsComplete'] else 'Supplied fields incomplete',
                           'Recovery':'File bytes match supplied inventory','Primary GPT':'Recomputed prefix checks passed',
@@ -215,6 +225,12 @@ def _assemble(manifest,manifest_pin,values,inputs,output,request_files=None):
                 codeSha256=dict(builder=sha(Path(__file__).read_bytes()),preparation=sha(Path(P.__file__).read_bytes()),
                     recovery=sha(Path(R.__file__).read_bytes()),firewall=sha(Path(F.__file__).read_bytes()),endpoint=sha(Path(E.__file__).read_bytes()),gptAuditor=sha(Path(G.__file__).read_bytes())))
     if storage_result: review['codeSha256']['storageEvidence']=sha(Path(S.__file__).read_bytes())
+    if gpt_result:
+        review['gptRecoveryEvidenceRecomputed']=True
+        review['gptRecoveryEvidenceCanonicalSha256']=P.digest(gpt_result)
+        review['gptRecoveryVerificationScope']='retained-backup-bytes'
+        review['codeSha256']['gptRecoveryAuditor']=sha(Path(H.__file__).read_bytes())
+        review['coverage']['Backup GPT and protective MBR']='Recomputed from backup; both entry arrays match'
     if request_files: review['codeSha256']['requestBuilder']=sha(Path(__file__).with_name('review_request.py').read_bytes())
     B.write(output/'review.html',render(review))
     review['files']=[dict(file=path.relative_to(output).as_posix(),sizeBytes=path.stat().st_size,sha256=sha(B.read(path))) for path in sorted(output.rglob('*')) if path.is_file()]
@@ -228,7 +244,7 @@ def main():
     parser=Parser(description=__doc__)
     for name in ('manifest','inputs','output'): parser.add_argument('--'+name,required=True,type=Path)
     parser.add_argument('--manifest-sha256',required=True)
-    parser.add_argument('--storage-input',type=Path,help='Optional v2 storage manifest location; its pinned bytes are still required.')
+    parser.add_argument('--storage-input',type=Path,help='Optional v2/v3 storage manifest location; its pinned bytes are still required.')
     args=parser.parse_args()
     try: result=build(args.manifest,args.manifest_sha256,args.inputs,args.output,args.storage_input)
     except (ValueError,OSError,UnicodeError,KeyError,TypeError,F.E.Ext4PathError,S.F.E.Ext4PathError,F.F.FirewallPatchError,F.A.CaptureFailure,B.A.CaptureFailure,RecursionError):

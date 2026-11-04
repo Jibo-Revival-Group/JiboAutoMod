@@ -1,5 +1,11 @@
 # One offline conversion review bundle
 
+For the optional v3 review, add `--gpt-recovery` to `review_request.py`. This
+recomputes the protective MBR and both GPT copies in the same pinned full backup.
+See [the recovery audit profile](gpt-recovery-audit.md) for limits, replay and
+the remaining physical, filesystem and apply gates. Existing v1/v2 defaults
+and their narrower coverage remain unchanged.
+
 `conversion_review.py` connects preparation, retained recovery bytes, a GPT
 audit, and the firewall/endpoint previews in one command. It recomputes the
 components from pinned inputs, compares retained GPT/rootfs bytes with a shared

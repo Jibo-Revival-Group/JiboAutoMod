@@ -31,6 +31,12 @@ The HTML page shows recovery/GPT checks, firewall and endpoint previews, matched
 configuration/region bytes and the remaining gates. **Apply is unavailable.**
 Generated request manifests and a file hash index are retained with each result.
 
+Updated packages run a v3 synthetic review with matching primary/backup GPT
+tables and a protective MBR. The [recovery-table audit](gpt-recovery-audit.md)
+explains the supported offline profile and the `--gpt-recovery` option for your
+retained inputs. Apply, physical identity and actual recovery remain unverified.
+Older published archives retain their original demo and tools.
+
 The separate pre-provisioning demo uses a synthetic blank credential file:
 
 ```text

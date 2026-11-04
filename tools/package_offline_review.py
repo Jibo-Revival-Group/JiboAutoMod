@@ -11,10 +11,10 @@ import tempfile
 import zipfile
 
 SCRIPTS=('demo_review.py','review_request.py','conversion_review.py','storage_evidence.py','oobe_intake.py','conversion_plan.py',
-         'recovery_evidence.py','gpt_audit.py','gpt_layout.py','firewall_preview.py','firewall_patch.py','ext4_path.py',
+         'recovery_evidence.py','gpt_audit.py','gpt_layout.py','gpt_recovery.py','firewall_preview.py','firewall_patch.py','ext4_path.py',
          'endpoint_preview.py','capture_bundle.py','capture_adapter.py','capture_process.py','capture_audit.py','pe_imports.py')
 DOCS=('offline-preview.md','oobe-storage-intake.md','conversion-preparation.md','conversion-review-bundle.md','storage-file-evidence.md',
-      'recovery-file-check.md','primary-gpt-audit.md','firewall-sector-preview.md','endpoint-file-preview.md',
+      'recovery-file-check.md','primary-gpt-audit.md','gpt-recovery-audit.md','firewall-sector-preview.md','endpoint-file-preview.md',
       'host-support.md','capture-process-cleanup.md','bounded-capture-adapter.md','capture-candidate.md','read-only-capture-build.md')
 DEMO_FILES=('inventory.json','target.json','audit.json','recovery-files.json','firewall-input.json','endpoint-input.json',
             'rootfsA.img','rootfsB.img','gpt-prefix.bin','full-storage.bin','calibration.bin','jetstream.json')
@@ -46,7 +46,7 @@ def package(source,output,revision):
     if output.exists(): raise ValueError('new output required')
     files={name:read(source/name).replace(b'\r\n',b'\n') for name in SCRIPTS}
     files.update({'Docs/'+name:read(source/'Docs'/name).replace(b'\r\n',b'\n') for name in DOCS})
-    files['README.md']=files['Docs/offline-preview.md'].replace(b'](conversion-review-bundle.md#',b'](Docs/conversion-review-bundle.md#').replace(b'](oobe-storage-intake.md)',b'](Docs/oobe-storage-intake.md)')
+    files['README.md']=files['Docs/offline-preview.md'].replace(b'](conversion-review-bundle.md#',b'](Docs/conversion-review-bundle.md#').replace(b'](oobe-storage-intake.md)',b'](Docs/oobe-storage-intake.md)').replace(b'](gpt-recovery-audit.md)',b'](Docs/gpt-recovery-audit.md)')
     files['profiles/S21firewall.v1']=read(source/'profiles/S21firewall.v1')
     if sha(files['profiles/S21firewall.v1'])!='cb34db864fee2e6725fa09a293c60fff003b87348a16553419926ee7cc1a1cc8':
         raise ValueError('profile changed')
@@ -56,9 +56,11 @@ def package(source,output,revision):
     import test_conversion_review_storage as fixture
     import test_conversion_review as base
     import test_storage_evidence as storage
+    import test_conversion_review_gpt as gpt_fixture
     with tempfile.TemporaryDirectory() as temporary:
         retained=Path(temporary).resolve()/'retained'
         values=fixture.fixture(retained)
+        gpt_fixture.add_recovery_tables(retained,values)
         del values['storageInput']
         values['audit']['checkedAtUtc']='2000-01-01T00:00:00+00:00'
         values['audit']['auditorSha256']=sha(files['gpt_audit.py'])

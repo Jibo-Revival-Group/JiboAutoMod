@@ -59,7 +59,28 @@ def main():
                        cwd=root,capture_output=True,timeout=60)
     assert run.returncode==0,run.stderr
     review=json.loads((root/'demo-result/review.json').read_bytes())
-    assert review['schema']=='openjibo.conversion-review-bundle.v2' and review['storageFileEvidenceRecomputed']
+    assert review['schema']=='openjibo.conversion-review-bundle.v3' and review['storageFileEvidenceRecomputed']
+    assert review['gptRecoveryEvidenceRecomputed'] and review['backupGptVerified'] and review['protectiveMbrVerified']
+    recovery=json.loads((root/'demo-result/gpt-recovery.json').read_bytes())
+    assert recovery['entryArraysEqual'] and recovery['verificationScope']=='retained-backup-bytes'
+    assert recovery['fullStorage']['sha256']==sha((extracted/'demo/retained/full-storage.bin').read_bytes())
+    audit_path=root/'standalone-gpt-recovery.json'
+    disk=extracted/'demo/retained/full-storage.bin'
+    audit_args=[sys.executable,'-I','-B',str(extracted/'gpt_recovery.py'),'--full-storage',str(disk),
+                '--disk-sectors','4096','--expected-sha256',sha(disk.read_bytes()),'--output',str(audit_path)]
+    audited=subprocess.run(audit_args,cwd=root,capture_output=True,timeout=30)
+    assert audited.returncode==0,audited.stderr
+    standalone=json.loads(audit_path.read_bytes())
+    for key in ('fullStorage','entryArraysSha256','primaryHeaderSha256','backupHeaderSha256','protectiveMbrSha256'):
+        assert standalone[key]==recovery[key]
+    assert standalone['backupGptVerified'] and standalone['protectiveMbrVerified'] and not standalone['readyForApply']
+    hybrid=bytearray(disk.read_bytes()); hybrid[462]=1
+    hybrid_path=root/'synthetic-hybrid.bin'; hybrid_path.write_bytes(hybrid)
+    bad_args=audit_args[:]; bad_args[bad_args.index('--full-storage')+1]=str(hybrid_path)
+    bad_args[bad_args.index('--expected-sha256')+1]=sha(hybrid)
+    refused_path=root/'refused-gpt-recovery.json'; bad_args[-1]=str(refused_path)
+    refused=subprocess.run(bad_args,cwd=root,capture_output=True,timeout=30)
+    assert refused.returncode==2 and not refused_path.exists()
     assert review['inputPinOrigin']=='generated-from-supplied-files' and not review['readyForApply'] and not review['physicalDeviceAssociationVerified']
     assert json.loads(run.stdout)['syntheticDemo']
     for item in review['files']:
@@ -78,14 +99,15 @@ def main():
     assert set(intake['credentialObservation']['fields'].values())=={'blank'}
     assert b'Synthetic demo' in (root/'intake-result/intake.html').read_bytes()
     assert before=={name:sha((extracted/name).read_bytes()) for name in names}
-    for script in ('review_request.py','conversion_review.py','storage_evidence.py','oobe_intake.py','capture_adapter.py','demo_review.py'):
+    for script in ('review_request.py','conversion_review.py','storage_evidence.py','oobe_intake.py','gpt_recovery.py','capture_adapter.py','demo_review.py'):
         help_run=subprocess.run([sys.executable,'-I','-B',str(extracted/script),'--help'],cwd=root,capture_output=True,timeout=10)
         assert help_run.returncode==0,help_run.stderr
     proof=dict(schema='openjibo.offline-review-release-check.v1',sourceRevision=args.source_revision,archiveSha256=sha(raw),
                builderSourceSha256=sha((source/'tools/package_offline_review.py').read_bytes().replace(b'\r\n',b'\n')),
                checkSourceSha256=sha(Path(__file__).read_bytes().replace(b'\r\n',b'\n')),
                repeatedBuildIdentical=True,allPayloadHashesVerified=True,extractedDemoPassed=True,hostLauncherPassed=True,
-               inputsUnchanged=True,syntheticOobeIntakePassed=True,syntheticOnly=True,readyForApply=False)
+               inputsUnchanged=True,syntheticOobeIntakePassed=True,syntheticGptRecoveryPassed=True,
+               standaloneGptRecoveryPassed=True,hybridMbrRefused=True,syntheticOnly=True,readyForApply=False)
     (root/'release-check.json').write_text(json.dumps(proof,indent=2)+'\n',encoding='utf-8')
     print('Portable offline release passed: repeatable archive, all hashes, extracted demo and host launcher; synthetic only.')
 
