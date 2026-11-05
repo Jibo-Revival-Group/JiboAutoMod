@@ -21,11 +21,9 @@ The five observed routing fields are `entrypoint_hostname`, `entrypoint_port`,
 independent. All other parsed JSON values and other region entries are preserved.
 No credentials region is invented or changed.
 
-The profile follows the runtime repository's
-[conversion helper at reviewed revision 806b5af](https://github.com/transcendentsoftware-jd/JiboExperiments/blob/806b5af72841e60ae7982ee3de3b09315ff40ff8/OpenJibo/scripts/bootstrap/apply-openjibo-conversion.sh)
-and [single-robot configuration guide](https://github.com/transcendentsoftware-jd/JiboExperiments/blob/806b5af72841e60ae7982ee3de3b09315ff40ff8/OpenJibo/docs/single-robot-http-self-hosting.md).
-The older helper also performs broader changes; this preview does not reproduce
-or authorize that apply path. It refuses top-level `regions`/`region-settings`
+The supported file profile is defined by `endpoint_preview.py` and its synthetic
+fixtures in `tests/test_endpoint_preview.py`. It describes only the five fields
+above and does not authorize another tool's apply path. It refuses top-level `regions`/`region-settings`
 duplicates, missing active regions, malformed objects, unknown fields in the
 selected routing entry/override, and bool/float ports. Other HubClient/root
 settings are preserved, but their runtime precedence is not verified.

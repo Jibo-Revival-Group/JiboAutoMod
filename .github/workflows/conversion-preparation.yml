@@ -25,6 +25,8 @@ jobs:
             python -B -m unittest discover -s tests -p $contract
             if ($LASTEXITCODE -ne 0) { throw "Compatibility contract failed: $contract" }
           }
+          python -B -m unittest discover -s tests -p test_community_scope.py
+          if ($LASTEXITCODE -ne 0) { throw 'Community documentation boundary failed.' }
       - name: Verify portable offline release with minimum Python
         shell: pwsh
         run: |

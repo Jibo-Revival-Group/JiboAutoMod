@@ -1,6 +1,6 @@
 # Jibo Auto-Mod Tool
 
-For factory/OOBE upgrade planning, start with the [software supply and provenance guide](Docs/oobe-software-supply.md). It separates measured software gaps from distribution rights and describes owner-local, authorized-download and replacement routes. The incoming units still require a per-robot inventory; this is not a firmware image or physical apply release.
+This is a Jibo Revival community project for device access, recovery and conversion tooling. Documentation and releases cover these tools and generic examples. Keep private experiment notes and separate commercial platform plans outside this repository; see [contributing](CONTRIBUTING.md).
 
 The optional [full-backup recovery-table audit](Docs/gpt-recovery-audit.md)
 now checks the protective MBR, both GPT headers and matching entry arrays.
