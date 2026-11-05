@@ -24,12 +24,12 @@ class CommunityScope(unittest.TestCase):
                      b'https://github.com/example/JiboExperiments/blob/revision/guide.md',
                      b'OpenJiboCloud subscription setup',b'No Mac test host is available.'):
             with self.subTest(note=note),tempfile.TemporaryDirectory() as temporary:
-                source=Path(temporary)/'source';source.mkdir();(source/'Docs').mkdir()
+                source=Path(temporary).resolve()/'source';source.mkdir();(source/'Docs').mkdir()
                 for name in P.SCRIPTS:shutil.copyfile(ROOT/name,source/name)
                 for name in P.DOCS:shutil.copyfile(ROOT/'Docs'/name,source/'Docs'/name)
                 shutil.copyfile(ROOT/'CONTRIBUTING.md',source/'CONTRIBUTING.md')
                 path=source/'Docs/offline-preview.md';path.write_bytes(path.read_bytes()+b'\n'+note)
-                output=Path(temporary)/'release'
+                output=Path(temporary).resolve()/'release'
                 with self.assertRaisesRegex(ValueError,'unrelated project or private test'):
                     P.package(source,output,'a'*40)
                 self.assertFalse(output.exists())
