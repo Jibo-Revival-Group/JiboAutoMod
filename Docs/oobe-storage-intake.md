@@ -115,3 +115,7 @@ Use `py -3` on Windows or `python3` on macOS/Linux as appropriate. The page is
 marked Synthetic demo. Existing `offline-review-2026.11.03-preview.1` archives
 remain unchanged and do not contain this newer intake tool/demo. The original
 demo continues to exercise the credentialed conversion-review flow separately.
+
+## Software supply
+
+These credential observations do not identify every installed component or determine software licensing. Use the [OOBE software supply and provenance guide](oobe-software-supply.md) to record factory software, missing capabilities and the applicable delivery rights before planning an upgrade.
