@@ -13,7 +13,7 @@ import zipfile
 SCRIPTS=('demo_review.py','review_request.py','conversion_review.py','storage_evidence.py','oobe_intake.py','conversion_plan.py',
          'recovery_evidence.py','gpt_audit.py','gpt_layout.py','gpt_recovery.py','firewall_preview.py','firewall_patch.py','ext4_path.py',
          'endpoint_preview.py','capture_bundle.py','capture_adapter.py','capture_process.py','capture_audit.py','pe_imports.py')
-DOCS=('offline-preview.md','oobe-storage-intake.md','conversion-preparation.md','conversion-review-bundle.md','storage-file-evidence.md',
+DOCS=('offline-preview.md','oobe-storage-intake.md','oobe-software-supply.md','conversion-preparation.md','conversion-review-bundle.md','storage-file-evidence.md',
       'recovery-file-check.md','primary-gpt-audit.md','gpt-recovery-audit.md','firewall-sector-preview.md','endpoint-file-preview.md',
       'host-support.md','capture-process-cleanup.md','bounded-capture-adapter.md','capture-candidate.md','read-only-capture-build.md')
 DEMO_FILES=('inventory.json','target.json','audit.json','recovery-files.json','firewall-input.json','endpoint-input.json',
