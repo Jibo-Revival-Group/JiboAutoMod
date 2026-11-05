@@ -1,5 +1,7 @@
 # Jibo Auto-Mod Tool
 
+For factory/OOBE upgrade planning, start with the [software supply and provenance guide](Docs/oobe-software-supply.md). It separates measured software gaps from distribution rights and describes owner-local, authorized-download and replacement routes. The incoming units still require a per-robot inventory; this is not a firmware image or physical apply release.
+
 The optional [full-backup recovery-table audit](Docs/gpt-recovery-audit.md)
 now checks the protective MBR, both GPT headers and matching entry arrays.
 Use `review_request.py --gpt-recovery` for a v3 combined review. The checks are
