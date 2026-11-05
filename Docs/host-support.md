@@ -63,6 +63,6 @@ handoff and verified rollback. Test the host OS, USB method and installed robot
 release as separate dimensions. Do not turn a Linux helper into a Windows or
 Darwin writer by changing path syntax alone.
 
-The server hosting matrix is separate from the conversion computer's OS. The
-neutral runtime's `OpenJibo/docs/platform-setup-guide.md` documents Compose,
-Linux-engine/CPU requirements, self-hosted setup and image acceptance limits.
+The server hosting matrix is separate from the conversion computer's OS. Consult
+the documentation for the server you choose for its OS, CPU, deployment and
+configuration requirements. This repository does not qualify a server platform.

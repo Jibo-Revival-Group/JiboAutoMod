@@ -27,10 +27,10 @@ def main():
     second=command[:]; second[-1]=str(root/'repeat')
     repeat=subprocess.run(second,cwd=root,capture_output=True,timeout=60)
     assert repeat.returncode==0,repeat.stderr
-    archive=root/'release/OpenJibo-Offline-Review.zip'
+    archive=root/'release/JiboRevival-Offline-Review.zip'
     raw=archive.read_bytes()
-    assert raw==(root/'repeat/OpenJibo-Offline-Review.zip').read_bytes()
-    assert sha(raw)==summary['sha256']==(root/'release/OpenJibo-Offline-Review.zip.sha256').read_text().split()[0]
+    assert raw==(root/'repeat/JiboRevival-Offline-Review.zip').read_bytes()
+    assert sha(raw)==summary['sha256']==(root/'release/JiboRevival-Offline-Review.zip.sha256').read_text().split()[0]
     extracted=root/'extracted package'; extracted.mkdir()
     with zipfile.ZipFile(archive) as bundle:
         entries=bundle.infolist()
@@ -44,6 +44,8 @@ def main():
     assert manifest['sourceRevision']==args.source_revision and manifest['syntheticDemo'] and not manifest['readyForApply']
     assert not manifest['hardwareCompatibilityVerified'] and not manifest['completeConversionPlan']
     names={item['file'] for item in manifest['files']}
+    assert 'Docs/oobe-software-supply.md' not in names and 'CONTRIBUTING.md' in names
+    assert (extracted/'README.md').read_bytes().startswith(b'# Jibo Revival offline review preview')
     assert names|{'release-manifest.json','SHA256SUMS'}=={p.relative_to(extracted).as_posix() for p in extracted.rglob('*') if p.is_file()}
     assert not any(name.startswith(('Exploits/','tests/','tools/','config.py','JiboModTool.py')) or name.endswith(('.exe','.dll','.dylib','.so','.bin')) and not name.startswith('demo/') for name in names)
     for item in manifest['files']:

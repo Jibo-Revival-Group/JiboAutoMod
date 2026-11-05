@@ -13,7 +13,7 @@ import zipfile
 SCRIPTS=('demo_review.py','review_request.py','conversion_review.py','storage_evidence.py','oobe_intake.py','conversion_plan.py',
          'recovery_evidence.py','gpt_audit.py','gpt_layout.py','gpt_recovery.py','firewall_preview.py','firewall_patch.py','ext4_path.py',
          'endpoint_preview.py','capture_bundle.py','capture_adapter.py','capture_process.py','capture_audit.py','pe_imports.py')
-DOCS=('offline-preview.md','oobe-storage-intake.md','oobe-software-supply.md','conversion-preparation.md','conversion-review-bundle.md','storage-file-evidence.md',
+DOCS=('offline-preview.md','oobe-storage-intake.md','conversion-preparation.md','conversion-review-bundle.md','storage-file-evidence.md',
       'recovery-file-check.md','primary-gpt-audit.md','gpt-recovery-audit.md','firewall-sector-preview.md','endpoint-file-preview.md',
       'host-support.md','capture-process-cleanup.md','bounded-capture-adapter.md','capture-candidate.md','read-only-capture-build.md')
 DEMO_FILES=('inventory.json','target.json','audit.json','recovery-files.json','firewall-input.json','endpoint-input.json',
@@ -21,6 +21,16 @@ DEMO_FILES=('inventory.json','target.json','audit.json','recovery-files.json','f
 
 
 def sha(raw): return hashlib.sha256(raw).hexdigest()
+
+
+def validate_community_documentation(files):
+    """Keep unrelated project plans and private experiments out of the release."""
+    excluded=re.compile(rb'Open[ -]?Jibo[ -]?Cloud|JiboExperiments|cloud\.openjibo\.com|CoffeeBreak|'
+                        rb'two incoming|incoming (?:factory|units|robots)|OOBE test units are awaiting|'
+                        rb'no Mac test host|native Ubuntu laptop',re.IGNORECASE)
+    for name,raw in files.items():
+        if name.lower().endswith('.md') and (name.rsplit('/',1)[-1]=='oobe-software-supply.md' or excluded.search(raw)):
+            raise ValueError('community package contains unrelated project or private test documentation')
 
 
 def ordinary(path):
@@ -47,6 +57,8 @@ def package(source,output,revision):
     files={name:read(source/name).replace(b'\r\n',b'\n') for name in SCRIPTS}
     files.update({'Docs/'+name:read(source/'Docs'/name).replace(b'\r\n',b'\n') for name in DOCS})
     files['README.md']=files['Docs/offline-preview.md'].replace(b'](conversion-review-bundle.md#',b'](Docs/conversion-review-bundle.md#').replace(b'](oobe-storage-intake.md)',b'](Docs/oobe-storage-intake.md)').replace(b'](gpt-recovery-audit.md)',b'](Docs/gpt-recovery-audit.md)')
+    files['CONTRIBUTING.md']=read(source/'CONTRIBUTING.md').replace(b'\r\n',b'\n')
+    validate_community_documentation(files)
     files['profiles/S21firewall.v1']=read(source/'profiles/S21firewall.v1')
     if sha(files['profiles/S21firewall.v1'])!='cb34db864fee2e6725fa09a293c60fff003b87348a16553419926ee7cc1a1cc8':
         raise ValueError('profile changed')
@@ -93,7 +105,7 @@ def package(source,output,revision):
     files['release-manifest.json']=json.dumps(manifest,sort_keys=True,indent=2).encode()+b'\n'
     files['SHA256SUMS']=''.join(sha(raw)+'  '+name+'\n' for name,raw in sorted(files.items())).encode('ascii')
     output.mkdir(mode=0o700,exist_ok=False)
-    archive=output/'OpenJibo-Offline-Review.zip'
+    archive=output/'JiboRevival-Offline-Review.zip'
     with zipfile.ZipFile(archive,'x',compression=zipfile.ZIP_STORED) as bundle:
         for name,raw in sorted(files.items()):
             entry=zipfile.ZipInfo(name,(2000,1,1,0,0,0)); entry.create_system=3

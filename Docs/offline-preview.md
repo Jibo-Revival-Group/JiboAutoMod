@@ -1,4 +1,4 @@
-# Open Jibo offline review preview
+# Jibo Revival offline review preview
 
 This preview lets you try the conversion review flow on Windows, macOS or Linux
 with Python 3.9 or newer. No extra Python packages, Docker, USB driver, robot,
@@ -35,7 +35,6 @@ Updated packages run a v3 synthetic review with matching primary/backup GPT
 tables and a protective MBR. The [recovery-table audit](gpt-recovery-audit.md)
 explains the supported offline profile and the `--gpt-recovery` option for your
 retained inputs. Apply, physical identity and actual recovery remain unverified.
-Older published archives retain their original demo and tools.
 
 The separate pre-provisioning demo uses a synthetic blank credential file:
 
@@ -47,7 +46,6 @@ Use the same OS-specific Python command as above. This page is explicitly marked
 Synthetic demo and observes missing/blank credential fields without inventing a
 region. It does not prove factory/OOBE state or readiness to provision. See
 [OOBE storage intake](oobe-storage-intake.md) in Docs for the separate contract.
-The older preview.1 release remains unchanged; it has only the original demo.
 
 ## Review your retained inputs
 
@@ -68,9 +66,9 @@ components are supplied or invoked by the demo/review entry points.
 ## Verify the download
 
 Compare the ZIP's SHA-256 with the published `.sha256` asset before extracting.
-Windows: `Get-FileHash .\OpenJibo-Offline-Review.zip -Algorithm SHA256`.
-macOS: `shasum -a 256 OpenJibo-Offline-Review.zip`.
-Linux: `sha256sum OpenJibo-Offline-Review.zip`.
+Windows: `Get-FileHash .\JiboRevival-Offline-Review.zip -Algorithm SHA256`.
+macOS: `shasum -a 256 JiboRevival-Offline-Review.zip`.
+Linux: `sha256sum JiboRevival-Offline-Review.zip`.
 
 `release-manifest.json` records the source commit and each payload hash/size;
 `SHA256SUMS` also indexes the manifest. These are integrity records, not signatures
@@ -78,6 +76,6 @@ or proof of trustworthy acquisition. Python/Markdown source uses LF line endings
 the exact firmware signature profile is preserved. The synthetic demo and archive
 metadata are deterministic so CI can compare all three OS builds byte for byte.
 
-This is a development prerelease of offline review, not hardware conversion or a
-hosted cloud release. Real retained configuration and future reviews may contain
+This is a development prerelease of offline review. Physical conversion remains
+unavailable. Real retained configuration and future reviews may contain
 private data; keep those inputs and output bundles private.
