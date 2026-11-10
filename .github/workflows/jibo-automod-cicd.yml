@@ -100,6 +100,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Read-only native contract failed.' }
           python -I -B tests/check_capture_adapter_native.py --fixture "$env:RUNNER_TEMP/readonly-native-contract"
           if ($LASTEXITCODE -ne 0) { throw 'Bounded capture adapter native integration failed.' }
+          python -I -B tests/check_payload_dispatch.py --compiler $compiler --output "$env:RUNNER_TEMP/readonly-native-contract/payload-dispatch" --source-revision '${{ github.sha }}'
+          if ($LASTEXITCODE -ne 0) { throw 'Inert payload dispatcher model failed.' }
 
       - name: Export Windows static runtime components without executing them
         if: runner.os == 'Windows'
