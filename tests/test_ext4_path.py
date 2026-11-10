@@ -83,5 +83,126 @@ class Ext4PathReaderTests(unittest.TestCase):
             reader.resolve("/etc/init.d/S21firewall")
 
 
+    def _legacy_inode(self, image, number, mode, size, pointers, flags=0):
+        offset = 3 * self.BLOCK + (number - 1) * 128
+        struct.pack_into("<H", image, offset, mode)
+        struct.pack_into("<I", image, offset + 4, size)
+        struct.pack_into("<I", image, offset + 32, flags)
+        struct.pack_into("<15I", image, offset + 40, *(list(pointers) + [0] * (15 - len(pointers))))
+
+    def test_resolves_legacy_direct_directory_and_regular_file(self):
+        image = bytearray(self._image())
+        self._legacy_inode(image, 2, 0x41ED, self.BLOCK, [10])
+        self._legacy_inode(image, 5, 0x81A4, len(SIGNATURE_ORIGINAL), [13, 14, 15, 16])
+        reader = Ext4PathReader(lambda offset, length: image[offset:offset + length], len(image))
+        inode = reader.resolve("/etc/init.d/S21firewall")
+        self.assertEqual(reader.read_file(inode), SIGNATURE_ORIGINAL)
+        self.assertEqual(reader.physical_offset(inode, 0), 13 * self.BLOCK)
+
+    def test_legacy_sparse_holes_stay_zero_and_have_no_physical_offset(self):
+        image = bytearray(self._image())
+        self._legacy_inode(image, 5, 0x81A4, 3 * self.BLOCK, [13, 0, 15])
+        image[13 * self.BLOCK:14 * self.BLOCK] = b'a' * self.BLOCK
+        image[15 * self.BLOCK:16 * self.BLOCK] = b'z' * self.BLOCK
+        reader = Ext4PathReader(lambda offset, length: image[offset:offset + length], len(image))
+        inode = reader.inode(5)
+        self.assertEqual(reader.read_file(inode), b'a' * self.BLOCK + bytes(self.BLOCK) + b'z' * self.BLOCK)
+        with self.assertRaisesRegex(Ext4PathError, "sparse hole"):
+            reader.physical_offset(inode, self.BLOCK)
+
+    def test_legacy_direct_boundary_and_empty_file(self):
+        for count in (0, 12):
+            with self.subTest(count=count):
+                image = bytearray(self._image())
+                pointers = list(range(13, 13 + count))
+                self._legacy_inode(image, 5, 0x81A4, count * self.BLOCK, pointers)
+                for logical, block in enumerate(pointers):
+                    image[block * self.BLOCK:(block + 1) * self.BLOCK] = bytes([logical]) * self.BLOCK
+                reader = Ext4PathReader(lambda offset, length: image[offset:offset + length], len(image))
+                inode = reader.inode(5)
+                self.assertEqual(reader.read_file(inode), b''.join(bytes([i]) * self.BLOCK for i in range(count)))
+                if count:
+                    self.assertEqual(reader.physical_offset(inode, 11 * self.BLOCK), 24 * self.BLOCK)
+
+    def test_legacy_invalid_repeated_and_indirect_blocks_refuse(self):
+        for size, pointers in ((self.BLOCK, [64]), (2 * self.BLOCK, [13, 13]),
+                               (13 * self.BLOCK, [13]), (self.BLOCK, [13] + [0] * 11 + [14])):
+            with self.subTest(size=size, pointers=pointers):
+                image = bytearray(self._image())
+                self._legacy_inode(image, 5, 0x81A4, size, pointers)
+                reader = Ext4PathReader(lambda offset, length: image[offset:offset + length], len(image))
+                with self.assertRaises(Ext4PathError):
+                    reader.read_file(reader.inode(5))
+
+    def test_legacy_encoded_data_and_symlink_maps_refuse(self):
+        for mode, flags in ((0x81A4, 0x4), (0x81A4, 0x800), (0x81A4, 0x10000000), (0xA1FF, 0)):
+            with self.subTest(mode=mode, flags=flags):
+                image = bytearray(self._image())
+                self._legacy_inode(image, 5, mode, 10, [13], flags)
+                reader = Ext4PathReader(lambda offset, length: image[offset:offset + length], len(image))
+                with self.assertRaises(Ext4PathError):
+                    reader.extents(reader.inode(5))
+
+    def _meta_image(self, *, sparse=True, sparse2=False, backup=0, traditional=False):
+        image = bytearray(545 * self.BLOCK)
+        sb = 1024
+        for offset, value in ((4, 545), (20, 1), (32, 16), (40, 4),
+                              (92, 0x200 if sparse2 else 0), (96, 0x50),
+                              (100, int(sparse)), (260, 2 if traditional else 0),
+                              (588, backup)):
+            struct.pack_into("<I", image, sb + offset, value)
+        struct.pack_into("<H", image, sb + 56, 0xEF53)
+        struct.pack_into("<H", image, sb + 88, 128)
+        # Group 33 lives in the second descriptor block, slot 1.
+        has_super = backup == 32 if sparse2 else not sparse
+        table = 3 if traditional else 513 + int(has_super)
+        struct.pack_into("<I", image, table * self.BLOCK + 32 + 8, 530)
+        inode = 530 * self.BLOCK
+        struct.pack_into("<H", image, inode, 0x81A4)
+        struct.pack_into("<I", image, inode + 4, 5)
+        struct.pack_into("<I", image, inode + 40, 533)
+        image[533 * self.BLOCK:533 * self.BLOCK + 5] = b"hello"
+        return image
+
+    def test_metadata_group_descriptor_locations(self):
+        for options in ({}, {"sparse": False}, {"sparse2": True},
+                        {"sparse2": True, "backup": 32}, {"traditional": True}):
+            with self.subTest(options=options):
+                image = self._meta_image(**options)
+                reader = Ext4PathReader(lambda o, n: image[o:o+n], len(image))
+                self.assertEqual(reader.read_file(reader.inode(133)), b"hello")
+                with self.assertRaisesRegex(Ext4PathError, "invalid inode group"):
+                    reader.inode(137)
+
+    def test_metadata_geometry_and_short_descriptor_refuse(self):
+        for offset, value in ((32, 0), (40, 0), (20, 0)):
+            image = self._meta_image()
+            struct.pack_into("<I", image, 1024 + offset, value)
+            with self.subTest(offset=offset), self.assertRaises(Ext4PathError):
+                Ext4PathReader(lambda o, n: image[o:o+n], len(image))
+        image = self._meta_image()
+        reader = Ext4PathReader(lambda o, n: image[o:o+n] if n != 32 else b"", len(image))
+        with self.assertRaisesRegex(Ext4PathError, "short filesystem read"):
+            reader.inode(133)
+
+    def test_non64bit_descriptor_size_and_64bit_refusal(self):
+        image = self._meta_image()
+        struct.pack_into("<H", image, 1024 + 254, 64)
+        reader = Ext4PathReader(lambda o, n: image[o:o+n], len(image))
+        self.assertEqual(reader.read_file(reader.inode(133)), b"hello")
+        struct.pack_into("<I", image, 1024 + 96, 0xD0)
+        with self.assertRaisesRegex(Ext4PathError, "64-bit"):
+            Ext4PathReader(lambda o, n: image[o:o+n], len(image))
+
+    def test_superblock_backup_group_rules(self):
+        image = self._meta_image()
+        reader = Ext4PathReader(lambda o, n: image[o:o+n], len(image))
+        for group in (0, 1, 3, 5, 7, 9, 25, 27, 49):
+            self.assertTrue(reader._group_has_super(group), group)
+        for group in (2, 6, 15, 21, 32):
+            self.assertFalse(reader._group_has_super(group), group)
+
+
+
 if __name__ == "__main__":
     unittest.main()

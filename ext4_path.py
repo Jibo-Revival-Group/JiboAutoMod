@@ -55,8 +55,14 @@ class Ext4PathReader:
         self.inode_size = struct.unpack_from("<H", superblock, 88)[0]
         self.feature_incompat = struct.unpack_from("<I", superblock, 96)[0]
         self.filesystem_uuid = superblock[104:120].hex()
-        raw_desc_size = struct.unpack_from("<H", superblock, 254)[0]
-        self.descriptor_size = max(32, raw_desc_size)
+        # This reader rejects 64-bit filesystems; their variable descriptor size
+        # must not be applied to the supported 32-byte format.
+        self.descriptor_size = 32
+        self.first_data_block = struct.unpack_from("<I", superblock, 20)[0]
+        self.feature_compat = struct.unpack_from("<I", superblock, 92)[0]
+        self.feature_ro_compat = struct.unpack_from("<I", superblock, 100)[0]
+        self.first_meta_bg = struct.unpack_from("<I", superblock, 260)[0]
+        self.backup_groups = struct.unpack_from("<II", superblock, 588)
 
         if self.block_size not in (1024, 2048, 4096):
             raise Ext4PathError(f"unsupported ext block size: {self.block_size}")
@@ -66,6 +72,10 @@ class Ext4PathReader:
             raise Ext4PathError("filesystem does not use extents")
         if self.feature_incompat & EXT4_FEATURE_INCOMPAT_64BIT:
             raise Ext4PathError("64-bit ext block addressing is not supported")
+        if not self.blocks_per_group or not self.inodes_per_group:
+            raise Ext4PathError("empty filesystem group geometry")
+        if self.feature_incompat & 0x10 and self.first_data_block != (self.block_size == 1024):
+            raise Ext4PathError("unsupported metadata-group first data block")
         if self.blocks_count * self.block_size > image_size:
             raise Ext4PathError("filesystem block count exceeds partition bounds")
 
@@ -82,12 +92,38 @@ class Ext4PathReader:
             raise Ext4PathError(f"invalid ext block: {block}")
         return self._read_exact(block * self.block_size, self.block_size)
 
+    def _group_has_super(self, group: int) -> bool:
+        if group == 0:
+            return True
+        if self.feature_compat & 0x200:  # sparse_super2
+            return group in self.backup_groups
+        if group == 1 or not self.feature_ro_compat & 1:
+            return True
+        for base in (3, 5, 7):
+            value = group
+            while value > 1 and value % base == 0:
+                value //= base
+            if value == 1:
+                return True
+        return False
+
     def _group_descriptor(self, group: int) -> bytes:
-        group_count = (self.blocks_count + self.blocks_per_group - 1) // self.blocks_per_group
+        group_count = (self.blocks_count - self.first_data_block + self.blocks_per_group - 1) // self.blocks_per_group
         if group < 0 or group >= group_count:
             raise Ext4PathError(f"invalid inode group: {group}")
-        table_block = 2 if self.block_size == 1024 else 1
-        offset = table_block * self.block_size + group * self.descriptor_size
+        per_block = self.block_size // self.descriptor_size
+        descriptor_block, slot = divmod(group, per_block)
+        if self.feature_incompat & 0x10 and descriptor_block >= self.first_meta_bg:
+            # META_BG stores each primary descriptor block in its first group,
+            # after a superblock when that group has one.
+            first_group = descriptor_block * per_block
+            table_block = (self.first_data_block + first_group * self.blocks_per_group
+                           + int(self._group_has_super(first_group)))
+        else:
+            table_block = (2 if self.block_size == 1024 else 1) + descriptor_block
+        if table_block >= self.blocks_count:
+            raise Ext4PathError("group descriptor exceeds filesystem bounds")
+        offset = table_block * self.block_size + slot * self.descriptor_size
         return self._read_exact(offset, self.descriptor_size)
 
     def inode(self, number: int) -> Inode:
@@ -143,15 +179,37 @@ class Ext4PathReader:
         return extents
 
     def extents(self, inode: Inode) -> list[Extent]:
-        if not inode.flags & EXT4_EXTENTS_FL:
-            raise Ext4PathError(f"inode {inode.number} does not use extents")
-        extents = sorted(self._parse_extent_node(inode.block_tree), key=lambda item: item.logical_block)
+        if inode.flags & EXT4_EXTENTS_FL:
+            extents = sorted(self._parse_extent_node(inode.block_tree), key=lambda item: item.logical_block)
+        else:
+            extents = self._legacy_direct_extents(inode)
         last_end = 0
         for extent in extents:
             if extent.logical_block < last_end:
                 raise Ext4PathError("overlapping or unsorted extents")
             last_end = extent.logical_block + extent.block_count
         return extents
+
+    def _legacy_direct_extents(self, inode: Inode) -> list[Extent]:
+        """Read only the twelve classic direct pointers; never guess indirect maps."""
+        if inode.mode & 0xF000 not in (0x8000, 0x4000):
+            raise Ext4PathError("legacy block maps require a regular file or directory")
+        if inode.flags & (0x00000004 | 0x00000800 | 0x10000000):
+            raise Ext4PathError("unsupported legacy inode data encoding")
+        pointers = struct.unpack("<15I", inode.block_tree)
+        needed = (inode.size + self.block_size - 1) // self.block_size
+        if needed > 12 or any(pointers[12:]):
+            raise Ext4PathError("legacy indirect block addressing is not supported")
+        result = []
+        seen = set()
+        for logical, physical in enumerate(pointers[:needed]):
+            if physical == 0:
+                continue
+            if physical >= self.blocks_count or physical in seen:
+                raise Ext4PathError("invalid or repeated legacy data block")
+            seen.add(physical)
+            result.append(Extent(logical, 1, physical))
+        return result
 
     def _inode_blocks(self, inode: Inode) -> Iterator[tuple[int, bytes]]:
         for extent in self.extents(inode):
