@@ -102,6 +102,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Bounded capture adapter native integration failed.' }
           python -I -B tests/check_payload_dispatch.py --compiler $compiler --output "$env:RUNNER_TEMP/readonly-native-contract/payload-dispatch" --source-revision '${{ github.sha }}'
           if ($LASTEXITCODE -ne 0) { throw 'Inert payload dispatcher model failed.' }
+          if (-not $IsWindows) {
+            python -I -B tests/check_payload_layout.py --elf Exploits/Shofel/build/emmc_server_readonly.elf --binary Exploits/Shofel/emmc_server_readonly.bin --output "$env:RUNNER_TEMP/readonly-native-contract/payload-layout" --source-revision '${{ github.sha }}'
+            if ($LASTEXITCODE -ne 0) { throw 'Payload initialization layout check failed.' }
+          }
 
       - name: Export Windows static runtime components without executing them
         if: runner.os == 'Windows'

@@ -127,6 +127,12 @@ and neither ROM transfer-count semantics nor physical timing are certified.
 The host's bulk timeout is recorded so a slow initialization remains visible
 without increasing timeouts, weakening admission checks or contacting USB.
 
+On Linux/macOS, `tests/check_payload_layout.py` compares allocated ELF sections
+with the raw payload image, requires included zero-filled BSS and the linker
+footer, and refuses four corrupted images. Its `payload-layout/` proof retains
+the matched ELF, binary and section report. This certifies a build layout only;
+it does not execute the ARM binary or establish compatibility with a device.
+
 CI artifacts retain fixture proofs and component hashes. They are build/test
 evidence, not an approved capture manifest, device test, restore proof or USB/
 driver certification. Fresh device admission and recovery review remain required.
