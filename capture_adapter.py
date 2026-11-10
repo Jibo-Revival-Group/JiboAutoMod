@@ -170,6 +170,12 @@ def capabilities(raw):
         storageSectorUpperBound=UPPER_SECTORS,payload='emmc_server_readonly.bin'))
 
 
+def diagnostic_codes(processes):
+    return sorted({code for process in processes for stream in ('stdout', 'stderr')
+                   for code in (process.get(stream) or {}).get('diagnosticCodes', [])
+                   if code in N.DIAGNOSTIC_CODES})
+
+
 def capture(manifest_path, manifest_pin, plan_path, plan_pin, bundle, output, cancellation=None):
     admitted = inputs(manifest_path, manifest_pin, plan_path, plan_pin)
     deadline = time.monotonic()+admitted['plan']['timeoutSeconds']
@@ -205,6 +211,7 @@ def capture(manifest_path, manifest_pin, plan_path, plan_pin, bundle, output, ca
         check_budget(deadline,cancellation); receipt['captureDispatchAttempted'] = True
         done = N.run(argv,work,child_env,deadline,cancellation,output=data,expected_size=admitted['expectedBytes'])
         receipt['processes'].append(done['summary'])
+        if diagnostic_codes(receipt['processes']): raise CaptureFailure('native-diagnostic-refusal')
         check_budget(deadline,cancellation)
         info = R.ordinary_path(data).lstat()
         require(stat.S_ISREG(info.st_mode) and info.st_size == admitted['expectedBytes'])
@@ -221,6 +228,11 @@ def capture(manifest_path, manifest_pin, plan_path, plan_pin, bundle, output, ca
     except (OSError, ValueError, UnicodeError): receipt['outcome']='artifact-io-failed'
     if not receipt['captureCompleted'] and data.exists():
         receipt['incompleteArtifact']=dict(file='work/capture.bin',admitted=False)
+    receipt['nativeDiagnosticCodes']=diagnostic_codes(receipt['processes'])
+    receipt['recovery']=dict(nativeDispatchOccurred=receipt['captureDispatchAttempted'], normalBootCheckRequired=True,
+        normalBootVerified=False, automaticRetryAllowed=False,
+        action='return-to-normal-boot-and-check-connectivity' if receipt['captureDispatchAttempted']
+               else 'inspect-preflight-and-confirm-normal-boot')
     receipt['deviceStateUncertain']=receipt['captureDispatchAttempted']
     receipt['finishedAtUtc']=datetime.now(timezone.utc).isoformat()
     P.export(receipt,output/'receipt.json')
@@ -242,7 +254,8 @@ def main():
         else:
             require(args.output is not None); result=capture(*values,args.output)
         print(json.dumps(dict(outcome=result.get('outcome','inspected'),readyForApply=False,
-                              captureCompleted=result.get('captureCompleted',False),receiptSha256=P.digest(result))))
+                              captureCompleted=result.get('captureCompleted',False),receiptSha256=P.digest(result),
+                              nativeDiagnosticCodes=result.get('nativeDiagnosticCodes',[]), recovery=result.get('recovery'))))
         return 0 if result.get('outcome','completed')=='completed' else 2
     except (CaptureFailure,ValueError,OSError,UnicodeError,RecursionError):
         parser.exit(2,'Capture adapter refused; inspect pinned inputs, local files and a new output. See Docs/bounded-capture-adapter.md.\n')

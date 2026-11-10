@@ -36,3 +36,8 @@ if mode=='change-component': Path('emmc_server_readonly.bin').write_bytes(b'chan
 if mode=='diagnostic-limit':
     sys.stderr.write('DO_NOT_ECHO_PRIVATE_DIAGNOSTIC'*4096); sys.stderr.flush()
 if mode=='exit-failure': raise SystemExit(7)
+
+if mode in ('handshake-reply-failure','failure-marker-exit-zero'):
+    sys.stderr.write('DO_NOT_ECHO_PRIVATE_DIAGNOSTIC\nOPENJIBO_CAPTURE_DIAGNOSTIC=handshake-reply-transfer-failed\n')
+    sys.stderr.flush()
+    raise SystemExit(7 if mode=='handshake-reply-failure' else 0)

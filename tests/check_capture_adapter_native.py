@@ -52,13 +52,44 @@ def main():
         assert receipt['readyForApply'] is False and receipt['deviceIdentityVerified'] is False and receipt['resetVerified'] is False
         assert (output/'capture.bin').read_bytes()==b'\x5A'*(count*512)
         receipts.append(dict(kind=kind,receiptSha256=adapter.P.digest(receipt),captureCompleted=True,readyForApply=False))
+    # Compile-time fixture variants cannot discover real USB and need no runtime
+    # environment injection into the production adapter's restricted environment.
+    for mode,code in (('handshake-command-failure','handshake-command-transfer-failed'),
+                      ('handshake-reply-failure','handshake-reply-transfer-failed'),
+                      ('init-failure','handshake-controller-uninitialized')):
+        failure_bundle=work/(mode+'-bundle'); failure_bundle.mkdir()
+        failure_host=fixture/('readonly-host-'+mode+('.exe' if os.name=='nt' else ''))
+        shutil.copyfile(failure_host,failure_bundle/host_name)
+        for name in ('emmc_server_readonly.bin','intermezzo.bin'):
+            shutil.copyfile(bundle/name,failure_bundle/name)
+        changed=json.loads(json.dumps(manifest))
+        changed['files'][0].update(sha256=hashlib.sha256(failure_host.read_bytes()).hexdigest(),sizeBytes=failure_host.stat().st_size)
+        mf=work/(mode+'-manifest.json'); mf.write_text(json.dumps(changed),encoding='utf-8')
+        mp=hashlib.sha256(mf.read_bytes()).hexdigest()
+        failed_plan=dict(schema='openjibo.readonly-capture-plan.v1',sourceRevision=revision,bundleSha256=mp,
+                         kind='primary-gpt-prefix',startSector=0,sectorCount=34,timeoutSeconds=10)
+        pf=work/(mode+'-plan.json'); pf.write_text(json.dumps(failed_plan),encoding='utf-8')
+        output=work/(mode+'-result')
+        launched=subprocess.run([sys.executable,'-I','-B',str(root/'capture_adapter.py'),'capture',
+            '--manifest',str(mf),'--manifest-sha256',mp,'--plan',str(pf),
+            '--plan-sha256',hashlib.sha256(pf.read_bytes()).hexdigest(),'--bundle',str(failure_bundle),'--output',str(output)],
+            capture_output=True,text=True,timeout=15)
+        assert launched.returncode==2,launched.stderr
+        receipt=json.loads((output/'receipt.json').read_bytes()); cli=json.loads(launched.stdout)
+        assert receipt['nativeDiagnosticCodes']==[code] and cli['nativeDiagnosticCodes']==[code]
+        assert not receipt['captureCompleted'] and receipt['deviceStateUncertain']
+        assert receipt['recovery']['normalBootCheckRequired'] and not receipt['recovery']['automaticRetryAllowed']
+        assert not receipt['recovery']['normalBootVerified'] and not (output/'capture.bin').exists()
+        assert (output/'work/capture.bin').stat().st_size==0
+        assert 'USB_FIXTURE_OPEN' not in json.dumps(receipt)
+        receipts.append(dict(kind=mode,receiptSha256=adapter.P.digest(receipt),captureCompleted=False,readyForApply=False))
     sources=work/'reviewed-source'; sources.mkdir()
     hashes=[]
     for name in ('capture_adapter.py','capture_process.py','recovery_evidence.py','conversion_plan.py'):
         shutil.copyfile(root/name,sources/name)
         hashes.append(dict(file='reviewed-source/'+name,sha256=hashlib.sha256((sources/name).read_bytes()).hexdigest()))
     (work/'proof.json').write_text(json.dumps(dict(scope='Actual C host with link-time USB stubs; no hardware',receipts=receipts,files=hashes),indent=2)+'\n',encoding='utf-8')
-    print('Bounded adapter native integration passed: primary prefix and EXT_CSD, no hardware access.')
+    print('Bounded adapter native integration passed: prefix, EXT_CSD and three handshake failures, no hardware access.')
 
 
 if __name__=='__main__': main()
