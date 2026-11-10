@@ -117,6 +117,16 @@ preprocessing verifies write/erase function removal in the restricted payload
 and retention in the original. Actual payload builds are checked for protocol
 constants. Real native hosts are invoked only with `--capabilities` in CI.
 
+`tests/check_payload_dispatch.py` also compiles a copied payload dispatcher with
+inert MMIO, ROM transport, initialization, sector-read and reset boundaries.
+Eleven scenarios cover exact/short/oversized command counts, legacy-opcode
+refusal, initialization failure and reply ordering across modeled durations.
+The generated source and proof are retained under `payload-dispatch/` in each
+native CI artifact. This is not a BootROM emulator: durations are test inputs,
+and neither ROM transfer-count semantics nor physical timing are certified.
+The host's bulk timeout is recorded so a slow initialization remains visible
+without increasing timeouts, weakening admission checks or contacting USB.
+
 CI artifacts retain fixture proofs and component hashes. They are build/test
 evidence, not an approved capture manifest, device test, restore proof or USB/
 driver certification. Fresh device admission and recovery review remain required.
