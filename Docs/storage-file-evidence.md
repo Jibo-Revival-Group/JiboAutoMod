@@ -106,6 +106,12 @@ compressed data. Sparse direct-file holes remain zero-filled and cannot provide
 a physical patch offset. This reader capability does not broaden this CLI's
 clean flat-extent admission profile or authorize a device write.
 
+The path reader also resolves primary META_BG descriptor blocks using the
+superblock's transition point and sparse-superblock placement rules. This is
+metadata inspection only; it does not recover journals, verify allocation, or
+broaden the CLI admission profile. The layout follows the
+[Linux ext4 specification](https://www.kernel.org/doc/html/latest/filesystems/ext4/group_descr.html).
+
 The backup is hashed through the same read-only descriptor used for later reads.
 Observable descriptor/path mutation is checked before completion. Subsequent reads
 are bounded to 8192 requests, 16 MiB total and 1 MiB each, within selected GPT
