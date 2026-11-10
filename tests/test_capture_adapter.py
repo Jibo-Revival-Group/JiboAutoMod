@@ -95,6 +95,15 @@ class CaptureAdapter(unittest.TestCase):
         self.assertFalse((self.output/'capture.bin').exists())
         self.assertTrue(result['deviceStateUncertain'])
 
+    def test_failure_marker_during_capability_check_prevents_native_dispatch(self):
+        result=self.capture('cap-failure-marker-exit-zero')
+        self.assertEqual(result['outcome'],'native-diagnostic-refusal')
+        self.assertFalse(result['captureDispatchAttempted'])
+        self.assertFalse(result['recovery']['nativeDispatchOccurred'])
+        self.assertEqual(result['nativeDiagnosticCodes'],['handshake-protocol-refused'])
+        self.assertFalse((self.output/'work/capture.bin').exists())
+        self.assertEqual(len(result['processes']),1)
+
     def test_pre_dispatch_refusal_does_not_certify_the_owners_boot_state(self):
         result=self.capture('wrong-capabilities')
         self.assertFalse(result['recovery']['nativeDispatchOccurred'])

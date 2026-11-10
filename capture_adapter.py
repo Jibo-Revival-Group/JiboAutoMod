@@ -204,6 +204,7 @@ def capture(manifest_path, manifest_pin, plan_path, plan_pin, bundle, output, ca
         child_env = environment(work)
         cap = N.run([host,'--capabilities'],work,child_env,deadline,cancellation,capabilities=True)
         receipt['processes'].append(cap['summary'])
+        if diagnostic_codes(receipt['processes']): raise CaptureFailure('native-diagnostic-refusal')
         try: capabilities(cap['stdout'])
         except (ValueError, UnicodeError, CaptureFailure, RecursionError): raise CaptureFailure('capabilities-rejected') from None
         for item in admitted['manifest']['files']: check_file(work/item['name'],item,deadline,cancellation)

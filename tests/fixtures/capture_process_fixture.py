@@ -21,6 +21,7 @@ if sys.argv[1]=='--capabilities':
     if mode=='duplicate-capabilities':
         print('{"schema":1,"schema":2}'); raise SystemExit(0)
     if mode=='cap-change-component': Path('emmc_server_readonly.bin').write_bytes(b'changed')
+    if mode=='cap-failure-marker-exit-zero': sys.stderr.write('OPENJIBO_CAPTURE_DIAGNOSTIC=handshake-protocol-refused\n')
     print(json.dumps(value)); raise SystemExit(0)
 assert sys.argv[1] in ('EMMC_READ','EMMC_READ_EXT_CSD')
 if sys.argv[1]=='EMMC_READ':
