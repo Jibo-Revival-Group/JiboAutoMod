@@ -94,6 +94,15 @@ class StorageEvidence(unittest.TestCase):
                      'deviceWritesPerformed', 'networkRequestsPerformed'):
             self.assertFalse(value[flag])
 
+    def test_legacy_reader_support_does_not_broaden_flat_extent_admission(self):
+        data = bytearray(self.images['credentials'])
+        ext4_fixture.Ext4PathReaderTests()._legacy_inode(data, 2, 0x41ed, 1024, [10])
+        self.images['credentials'] = bytes(data)
+        self.save()
+        with self.assertRaises(ValueError):
+            self.run_evidence()
+        self.assertFalse(self.output.exists())
+
     def test_exact_jetstream_bytes_required_even_if_same_json_semantics(self):
         self.config += b'\n'
         self.save()

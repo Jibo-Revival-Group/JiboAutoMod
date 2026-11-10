@@ -99,6 +99,13 @@ There is no guarantee of clearing Python process memory after parsing.
 
 ## Bounds and remaining work
 
+The underlying path reader can also inspect small classic direct-block inodes
+inside the supported ext4 layout. It bounds all twelve direct pointers and rejects
+indirect maps, invalid/repeated blocks, symlinks and encoded inline/encrypted/
+compressed data. Sparse direct-file holes remain zero-filled and cannot provide
+a physical patch offset. This reader capability does not broaden this CLI's
+clean flat-extent admission profile or authorize a device write.
+
 The backup is hashed through the same read-only descriptor used for later reads.
 Observable descriptor/path mutation is checked before completion. Subsequent reads
 are bounded to 8192 requests, 16 MiB total and 1 MiB each, within selected GPT

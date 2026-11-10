@@ -143,15 +143,37 @@ class Ext4PathReader:
         return extents
 
     def extents(self, inode: Inode) -> list[Extent]:
-        if not inode.flags & EXT4_EXTENTS_FL:
-            raise Ext4PathError(f"inode {inode.number} does not use extents")
-        extents = sorted(self._parse_extent_node(inode.block_tree), key=lambda item: item.logical_block)
+        if inode.flags & EXT4_EXTENTS_FL:
+            extents = sorted(self._parse_extent_node(inode.block_tree), key=lambda item: item.logical_block)
+        else:
+            extents = self._legacy_direct_extents(inode)
         last_end = 0
         for extent in extents:
             if extent.logical_block < last_end:
                 raise Ext4PathError("overlapping or unsorted extents")
             last_end = extent.logical_block + extent.block_count
         return extents
+
+    def _legacy_direct_extents(self, inode: Inode) -> list[Extent]:
+        """Read only the twelve classic direct pointers; never guess indirect maps."""
+        if inode.mode & 0xF000 not in (0x8000, 0x4000):
+            raise Ext4PathError("legacy block maps require a regular file or directory")
+        if inode.flags & (0x00000004 | 0x00000800 | 0x10000000):
+            raise Ext4PathError("unsupported legacy inode data encoding")
+        pointers = struct.unpack("<15I", inode.block_tree)
+        needed = (inode.size + self.block_size - 1) // self.block_size
+        if needed > 12 or any(pointers[12:]):
+            raise Ext4PathError("legacy indirect block addressing is not supported")
+        result = []
+        seen = set()
+        for logical, physical in enumerate(pointers[:needed]):
+            if physical == 0:
+                continue
+            if physical >= self.blocks_count or physical in seen:
+                raise Ext4PathError("invalid or repeated legacy data block")
+            seen.add(physical)
+            result.append(Extent(logical, 1, physical))
+        return result
 
     def _inode_blocks(self, inode: Inode) -> Iterator[tuple[int, bytes]]:
         for extent in self.extents(inode):
