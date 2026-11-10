@@ -5,14 +5,26 @@
 
 static uint32_t op, cursor, remaining;
 static int phase;
-static int mode(const char *value) { const char *current = getenv("READONLY_FIXTURE_MODE"); return current && !strcmp(current, value); }
+static unsigned status_commands, read_commands, exit_commands;
+#ifndef READONLY_FIXTURE_DEFAULT_MODE
+#define READONLY_FIXTURE_DEFAULT_MODE ""
+#endif
+static int mode(const char *value) {
+    const char *current = getenv("READONLY_FIXTURE_MODE");
+    if (!current || !*current) current = READONLY_FIXTURE_DEFAULT_MODE;
+    return !strcmp(current, value);
+}
 static void check(int condition) { if (!condition) { fputs("Fixture protocol violation.\n", stderr); exit(91); } }
 
 int usb_open_by_vid_pid(uint16_t vid, uint16_t pid, uint8_t wait) {
     check(vid == JIBO_TK1_VID && pid == JIBO_TK1_PID && wait == 1);
     fputs("USB_FIXTURE_OPEN\n", stderr); return 1;
 }
-int usb_close(int usb) { check(usb == 1); return 0; }
+int usb_close(int usb) {
+    check(usb == 1);
+    fprintf(stderr, "USB_FIXTURE_COUNTS status=%u reads=%u exits=%u\n", status_commands, read_commands, exit_commands);
+    return 0;
+}
 int usb_clear_halt(int usb, uint32_t ep) { check(usb == 1 && ep == 1); return 0; }
 int send_rcm_cmd(int usb, char *payload, uint32_t thumb, int debug) {
     check(usb == 1 && !strcmp(payload, "emmc_server_readonly.bin") && thumb == 1 && debug == 0); return 0;
@@ -25,18 +37,26 @@ int usb_send_bulk_txn(int usb, uint32_t ep, uint32_t length, void *bytes, int de
         check(length == sizeof(struct emmc_cmd_s));
         struct emmc_cmd_s *cmd = bytes; check(emmc_ro_command_allowed(cmd));
         op = cmd->op; cursor = cmd->start_sector; remaining = cmd->num_sectors; phase = 1;
-        return op == EMMC_CMD_EXIT && mode("exit-failure") ? -1 : 0;
+        if (op == EMMC_CMD_STATUS) ++status_commands;
+        if (op == EMMC_CMD_READ || op == EMMC_CMD_READ_EXT_CSD) ++read_commands;
+        if (op == EMMC_CMD_EXIT) ++exit_commands;
+        if (op == EMMC_CMD_STATUS && mode("handshake-command-failure")) return -1;
+        return op == EMMC_CMD_EXIT && (mode("exit-failure") || mode("handshake-reply-and-exit-failure")) ? -1 : 0;
     }
     check(ep == RCM_EP1_IN);
     if (!op) { check(length == RCM_CHIP_ID_LEN); memset(bytes, 0xA5, length); return 0; }
     if (op == EMMC_CMD_STATUS) {
-        check(length == 512); memset(bytes, 0, length);
+        check(length == 512);
+        if (mode("handshake-reply-failure") || mode("handshake-reply-and-exit-failure")) return -1;
+        memset(bytes, 0, length);
         uint32_t *status = bytes;
         status[0] = mode("legacy-payload") ? 0xCAFE0000 : EMMC_RO_STATUS_MAGIC;
-        status[1] = mode("clock-warning") ? 0xD0000001 : 0;
+        status[1] = mode("clock-warning") ? 0xD0000001 : mode("clock-failure") ? 0xD0000002 : 0;
         status[2] = mode("init-failure") ? 0 : 1;
         status[13] = mode("sector-zero-failure") ? 1 : 0;
-        status[56] = 1; status[57] = mode("wrong-limits") ? 8192 : EMMC_RO_MAX_READ_SECTORS; status[58] = EMMC_RO_STORAGE_SECTORS;
+        status[56] = mode("wrong-version") ? 2 : 1;
+        status[57] = mode("wrong-limits") ? 8192 : EMMC_RO_MAX_READ_SECTORS;
+        status[58] = mode("wrong-storage-limit") ? EMMC_RO_STORAGE_SECTORS-1 : EMMC_RO_STORAGE_SECTORS;
         return 0;
     }
     check(op == EMMC_CMD_READ || op == EMMC_CMD_READ_EXT_CSD);

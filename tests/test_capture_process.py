@@ -12,6 +12,42 @@ sys.path.insert(0,str(Path(__file__).parents[1]))
 import capture_process as N
 
 
+class DiagnosticParsing(unittest.TestCase):
+    def test_all_codes_accept_only_complete_exact_lines_across_every_split(self):
+        for code in N.DIAGNOSTIC_CODES:
+            for ending in (b'\n',b'\r\n'):
+                raw=b'OPENJIBO_CAPTURE_DIAGNOSTIC='+code.encode()+ending
+                for split in range(len(raw)+1):
+                    parser=N.DiagnosticCodes(); parser.feed(raw[:split]); parser.feed(raw[split:])
+                    parser.finish(); self.assertEqual(parser.codes,{code})
+                    self.assertEqual(parser.pending,bytearray())
+
+    def test_unknown_embedded_long_truncated_and_non_ascii_lines_are_discarded(self):
+        marker=b'OPENJIBO_CAPTURE_DIAGNOSTIC=handshake-reply-transfer-failed'
+        for raw in (b'private '+marker+b'\n',marker+b' private\n',marker,
+                    marker+b'\r\r\n',marker+b'\xff\n',b'x'*129+marker+b'\n',
+                    b'OPENJIBO_CAPTURE_DIAGNOSTIC=unknown\n'):
+            parser=N.DiagnosticCodes(); parser.feed(raw); parser.finish()
+            self.assertEqual(parser.codes,set()); self.assertEqual(parser.pending,bytearray())
+
+    def test_overflow_recovers_at_newline_and_codes_are_bounded_and_deduplicated(self):
+        parser=N.DiagnosticCodes(); parser.feed(b'x'*8192+b'\n')
+        marker=b'OPENJIBO_CAPTURE_DIAGNOSTIC=exit-transfer-failed\n'
+        parser.feed(marker*1000); parser.finish()
+        self.assertEqual(parser.codes,{'exit-transfer-failed'})
+
+    def test_drain_records_codes_with_counts_hashes_and_no_raw_bytes(self):
+        raw=b'DO_NOT_ECHO_PRIVATE\nOPENJIBO_CAPTURE_DIAGNOSTIC=handshake-command-transfer-failed\n'
+        drain=N.Drain(io.BytesIO(raw),8192,False); self.assertTrue(drain.finished.wait(2))
+        value=drain.summary(); self.assertEqual(value['diagnosticCodes'],['handshake-command-transfer-failed'])
+        self.assertEqual(drain.bytes,bytearray()); self.assertNotIn('DO_NOT_ECHO',json.dumps(value))
+
+    def test_markers_beyond_diagnostic_budget_are_not_admitted(self):
+        raw=b'x'*20+b'\nOPENJIBO_CAPTURE_DIAGNOSTIC=exit-transfer-failed\n'
+        drain=N.Drain(io.BytesIO(raw),20,False); self.assertTrue(drain.finished.wait(2))
+        self.assertTrue(drain.exceeded.is_set()); self.assertEqual(drain.summary()['diagnosticCodes'],[])
+
+
 class FakeProcess:
     pid=12345
     def __init__(self,flood=True):

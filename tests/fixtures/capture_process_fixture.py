@@ -21,6 +21,7 @@ if sys.argv[1]=='--capabilities':
     if mode=='duplicate-capabilities':
         print('{"schema":1,"schema":2}'); raise SystemExit(0)
     if mode=='cap-change-component': Path('emmc_server_readonly.bin').write_bytes(b'changed')
+    if mode=='cap-failure-marker-exit-zero': sys.stderr.write('OPENJIBO_CAPTURE_DIAGNOSTIC=handshake-protocol-refused\n')
     print(json.dumps(value)); raise SystemExit(0)
 assert sys.argv[1] in ('EMMC_READ','EMMC_READ_EXT_CSD')
 if sys.argv[1]=='EMMC_READ':
@@ -36,3 +37,8 @@ if mode=='change-component': Path('emmc_server_readonly.bin').write_bytes(b'chan
 if mode=='diagnostic-limit':
     sys.stderr.write('DO_NOT_ECHO_PRIVATE_DIAGNOSTIC'*4096); sys.stderr.flush()
 if mode=='exit-failure': raise SystemExit(7)
+
+if mode in ('handshake-reply-failure','failure-marker-exit-zero'):
+    sys.stderr.write('DO_NOT_ECHO_PRIVATE_DIAGNOSTIC\nOPENJIBO_CAPTURE_DIAGNOSTIC=handshake-reply-transfer-failed\n')
+    sys.stderr.flush()
+    raise SystemExit(7 if mode=='handshake-reply-failure' else 0)

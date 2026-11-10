@@ -87,8 +87,8 @@ covers component checks/copy, capability/read processes and evidence checks;
 filesystem loops check it cooperatively. Diagnostic pipes are drained concurrently
 with bounded data: capability stdout 4 KiB, capture stdout 16 KiB, stderr at most
 8 KiB (4 KiB during capabilities). Limit violations fail the attempt. Raw capture
-text is discarded; receipts contain bounded counts/hashes, not diagnostics. Pipe
-EOF is required in addition to initial process exit.
+text is discarded; receipts contain bounded counts/hashes and allowlisted fixed
+failure codes, never arbitrary diagnostic text. Pipe EOF is required in addition to initial process exit.
 
 POSIX children use their own session/process group. Windows children start
 suspended, enter a kill-on-close job, then resume. Cancellation/timeout triggers
@@ -116,6 +116,35 @@ Even completion leaves `readyForApply`, `deviceIdentityVerified`, `resetVerified
 and `robotCompatibilityVerified` false. Capture can load RAM and change boot/
 session state. `deviceStateUncertain` remains true after dispatch; EXIT does not
 prove normal boot/reconnect. No storage-write command is requested.
+
+## Failure diagnostics and recovery
+
+The supervisor recognizes only complete exact allowlisted
+`OPENJIBO_CAPTURE_DIAGNOSTIC=<code>` lines within its existing stream budget.
+Unknown, embedded, oversized, non-ASCII and unterminated markers are discarded.
+Recognition handles pipe chunk boundaries and LF/CRLF endings; codes are bounded
+and deduplicated. Raw text and partial line buffers are not retained in receipts.
+
+Per-stream summaries expose `diagnosticCodes`; capture receipts and CLI output
+also expose the combined `nativeDiagnosticCodes`. These codes are observations,
+not successful capture evidence. A recognized failure code cannot admit full
+output even if a child incorrectly exits zero. Existing completed-receipt checks
+still apply; legacy receipts without these optional fields remain readable.
+
+Capture receipts and CLI output include a `recovery` object with
+`nativeDispatchOccurred`, `normalBootCheckRequired`, `normalBootVerified`,
+`automaticRetryAllowed` and a fixed `action`. The adapter never certifies normal
+boot and never automatically retries. A preflight refusal reports no native
+dispatch, but the owner may already have placed the unit in recovery mode; confirm
+its boot state instead of assuming it was unaffected. After dispatch, return the
+unit to normal boot and check connectivity before considering a new reviewed
+attempt. A successful EXIT or complete capture does not replace that check.
+
+Preserve the receipt and incomplete files. If networking does not recover, stop
+the experiment and use an independently established debug/control transport to
+collect bounded network/driver evidence before further state changes. Do not
+weaken the handshake or treat a full-size failed file as a restore image. Actual
+reset, reconnect and restoration acceptance remain hardware gates.
 
 ## Acceptance and next work
 

@@ -26,12 +26,17 @@ def main():
     def run(command, **kwargs):
         return subprocess.run([str(part) for part in command], capture_output=True, text=True,
                               errors='replace', timeout=30, **kwargs)
-    def compile_program(name, sources, readonly=True):
+    def compile_program(name, sources, readonly=True, extra=()):
         executable = output/(name+suffix)
-        result = run([args.compiler, *flags, *(ro if readonly else []), *include, *sources, '-o', executable])
+        result = run([args.compiler, *flags, *(ro if readonly else []), *extra, *include, *sources, '-o', executable])
         if result.returncode != 0: raise SystemExit('Native fixture compilation failed.\n'+result.stderr)
         return executable
     host = compile_program('readonly-host-fixture', [native/'exploit/shofel2_t124.c', root/'tests/native/readonly_usb_stub.c'])
+    failure_hosts = {}
+    for mode in ('handshake-command-failure','handshake-reply-failure','init-failure'):
+        failure_hosts[mode] = compile_program('readonly-host-'+mode,
+            [native/'exploit/shofel2_t124.c', root/'tests/native/readonly_usb_stub.c'],
+            extra=['-DREADONLY_FIXTURE_DEFAULT_MODE="'+mode+'"'])
     policy = compile_program('readonly-policy', [root/'tests/native/readonly_policy.c'])
     legacy = compile_program('legacy-protocol', [root/'tests/native/legacy_protocol.c'], readonly=False)
     for executable in (policy, legacy):
@@ -82,12 +87,31 @@ def main():
     ext = output/'ext-csd.bin'
     invoke(['EMMC_READ_EXT_CSD',str(ext)], usb=True, success=True)
     assert ext.read_bytes() == b'\x5A'*512
-    for mode in ('legacy-payload','wrong-limits','init-failure','sector-zero-failure','read-failure','wrong-frame',
-                 'wrong-sector','wrong-count','short-header','short-data','control-zero','late-read-failure','exit-failure'):
+    handshake_failures = {
+        'handshake-command-failure':'handshake-command-transfer-failed',
+        'handshake-reply-failure':'handshake-reply-transfer-failed',
+        'legacy-payload':'handshake-protocol-refused',
+        'wrong-version':'handshake-version-refused',
+        'wrong-limits':'handshake-limits-refused',
+        'wrong-storage-limit':'handshake-limits-refused',
+        'init-failure':'handshake-controller-uninitialized',
+        'sector-zero-failure':'handshake-sector-zero-read-failed',
+        'clock-failure':'handshake-startup-status-refused',
+        'handshake-reply-and-exit-failure':'handshake-reply-transfer-failed',
+    }
+    for mode in (*handshake_failures, 'read-failure','wrong-frame','wrong-sector','wrong-count',
+                 'short-header','short-data','control-zero','late-read-failure','exit-failure'):
         path = output/(mode+'.bin')
-        invoke(['EMMC_READ','0','9',str(path)], mode=mode, usb=True)
+        result=invoke(['EMMC_READ','0','9',str(path)], mode=mode, usb=True)
         expected = 4096 if mode == 'late-read-failure' else 4608 if mode == 'exit-failure' else 0
         assert path.stat().st_size == expected
+        if mode in handshake_failures:
+            code=handshake_failures[mode]
+            assert 'OPENJIBO_CAPTURE_DIAGNOSTIC='+code+'\n' in result.stderr
+            assert 'USB_FIXTURE_COUNTS status=1 reads=0 exits=1\n' in result.stderr
+            assert '0xCAFE' not in result.stderr and '0xD000' not in result.stderr
+        if mode in ('exit-failure','handshake-reply-and-exit-failure'):
+            assert 'OPENJIBO_CAPTURE_DIAGNOSTIC=exit-transfer-failed\n' in result.stderr
     ext_failed = output/'ext-csd-error.bin'
     invoke(['EMMC_READ_EXT_CSD',str(ext_failed)], mode='read-failure', usb=True)
     assert ext_failed.stat().st_size == 0
@@ -96,9 +120,12 @@ def main():
         actual = run([args.real_host.absolute(), '--capabilities'])
         assert actual.returncode == 0 and json.loads(actual.stdout) == capabilities
     sources = output/'reviewed-source'; sources.mkdir()
-    files = [host,policy,legacy]
+    files = [host,policy,legacy,*failure_hosts.values()]
     for source in (native/'exploit/shofel2_t124.c',native/'payloads/emmc_server.c',native/'include/emmc_server.h'):
         copied = sources/source.name; shutil.copyfile(source,copied); files.append(copied)
+    for source in (root/'tests/native/readonly_usb_stub.c',root/'tests/native/readonly_policy.c',
+                   root/'tests/native/legacy_protocol.c',Path(__file__)):
+        copied=sources/source.name; shutil.copyfile(source,copied); files.append(copied)
     built = output/'built-components'; built.mkdir()
     payload = native/'emmc_server_readonly.bin'
     components = [args.real_host.absolute()] if args.real_host else []

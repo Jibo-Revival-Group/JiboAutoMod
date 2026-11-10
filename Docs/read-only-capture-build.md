@@ -76,6 +76,34 @@ failed files as incomplete. The host does not delete them or certify identity.
 The separate [GPT audit](primary-gpt-audit.md) still cannot prove backup GPT,
 physical association, release/filesystem support or apply readiness.
 
+## Fixed handshake diagnostics
+
+The restricted host retains the same protocol/version/geometry/controller/read
+admission checks and sends no data read after handshake refusal. It now emits
+fixed `OPENJIBO_CAPTURE_DIAGNOSTIC=<code>` lines on stderr:
+
+| Code | Failed boundary |
+| --- | --- |
+| `handshake-command-transfer-failed` | Sending the initial status command |
+| `handshake-reply-transfer-failed` | Receiving its complete status reply |
+| `handshake-protocol-refused` | Read-only protocol magic |
+| `handshake-version-refused` | Protocol version |
+| `handshake-limits-refused` | Read or storage admission bounds |
+| `handshake-controller-uninitialized` | Controller initialization status |
+| `handshake-sector-zero-read-failed` | Required sector-zero read status |
+| `handshake-startup-status-refused` | Startup status outside the existing accepted values |
+| `exit-transfer-failed` | Sending EXIT during cleanup |
+
+Codes contain no register values, chip identifiers or storage bytes. An EXIT
+failure can accompany the original handshake failure; neither is suppressed.
+There are no new retries, alternate payloads, reset commands or relaxed guards.
+The original general-purpose build's behavior is unchanged.
+
+A code reports which boundary refused; it does not establish the underlying
+hardware/firmware cause or prove normal boot. Use the
+[adapter recovery guidance](bounded-capture-adapter.md#failure-diagnostics-and-recovery)
+for retained evidence and operator follow-up.
+
 ## Validation
 
 CI builds normal/restricted hosts on Windows/macOS/Linux and payloads on

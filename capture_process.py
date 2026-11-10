@@ -86,10 +86,47 @@ class WindowsJob:
         finally: self.api.CloseHandle(snapshot)
 
 
+DIAGNOSTIC_CODES = frozenset((
+    'handshake-command-transfer-failed', 'handshake-reply-transfer-failed',
+    'handshake-protocol-refused', 'handshake-version-refused',
+    'handshake-limits-refused', 'handshake-controller-uninitialized',
+    'handshake-sector-zero-read-failed', 'handshake-startup-status-refused',
+    'exit-transfer-failed',
+))
+DIAGNOSTIC_LINES = {b'OPENJIBO_CAPTURE_DIAGNOSTIC='+code.encode('ascii'): code
+                    for code in DIAGNOSTIC_CODES}
+
+
+class DiagnosticCodes:
+    """Recognize complete exact allowlisted lines; discard every other byte."""
+    def __init__(self):
+        self.codes = set()
+        self.pending = bytearray()
+        self.overflow = False
+
+    def feed(self, block):
+        for value in block:
+            if value == 10:
+                if not self.overflow:
+                    line = bytes(self.pending)
+                    if line.endswith(b'\r'): line = line[:-1]
+                    code = DIAGNOSTIC_LINES.get(line)
+                    if code is not None: self.codes.add(code)
+                self.pending.clear(); self.overflow = False
+            elif not self.overflow:
+                if len(self.pending) < 128: self.pending.append(value)
+                else: self.pending.clear(); self.overflow = True
+
+    def finish(self):
+        # Unterminated or partial markers are not admitted.
+        self.pending.clear(); self.overflow = False
+
+
 class Drain:
     def __init__(self, stream, limit, retain):
         self.stream = stream; self.limit = limit; self.retain = retain
         self.bytes = bytearray(); self.count = 0; self.sha = hashlib.sha256()
+        self.diagnostics = DiagnosticCodes()
         self.lock = threading.Lock()
         self.exceeded = threading.Event(); self.finished = threading.Event()
         self.error = False
@@ -104,6 +141,7 @@ class Drain:
                 with self.lock:
                     remaining = max(0, self.limit-self.count)
                     self.sha.update(block[:remaining])
+                    self.diagnostics.feed(block[:remaining])
                     if self.retain: self.bytes.extend(block[:remaining])
                     self.count = min(self.limit+1, self.count+len(block))
                     if self.count > self.limit: self.exceeded.set()
@@ -111,12 +149,15 @@ class Drain:
         finally:
             try: self.stream.close()
             except (OSError, ValueError): self.error = True
-            finally: self.finished.set()
+            finally:
+                with self.lock: self.diagnostics.finish()
+                self.finished.set()
 
     def summary(self):
         with self.lock:
             return dict(observedBytes=self.count, limitExceeded=self.exceeded.is_set(),
-                        boundedSha256=self.sha.hexdigest(), rawDiagnosticsRetained=False)
+                        boundedSha256=self.sha.hexdigest(), rawDiagnosticsRetained=False,
+                        diagnosticCodes=sorted(self.diagnostics.codes))
 
 
 def failure_details(error,phase):

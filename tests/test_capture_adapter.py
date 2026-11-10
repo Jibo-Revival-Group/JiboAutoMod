@@ -79,6 +79,39 @@ class CaptureAdapter(unittest.TestCase):
         self.assertEqual(34*512,(self.output/'work/capture.bin').stat().st_size)
         self.assertFalse(value['incompleteArtifact']['admitted']); self.assertFalse((self.output/'capture.bin').exists())
 
+    def test_handshake_failure_code_survives_without_raw_text_or_admitted_data(self):
+        result=self.capture('handshake-reply-failure')
+        self.assertFalse(result['captureCompleted'])
+        self.assertEqual(result['nativeDiagnosticCodes'],['handshake-reply-transfer-failed'])
+        self.assertEqual(result['recovery'],dict(nativeDispatchOccurred=True,normalBootCheckRequired=True,normalBootVerified=False,
+            automaticRetryAllowed=False,action='return-to-normal-boot-and-check-connectivity'))
+        self.assertFalse((self.output/'capture.bin').exists())
+        self.assertNotIn('DO_NOT_ECHO',json.dumps(result))
+
+    def test_failure_marker_never_admits_full_bytes_even_with_zero_exit(self):
+        result=self.capture('failure-marker-exit-zero')
+        self.assertEqual(result['outcome'],'native-diagnostic-refusal')
+        self.assertFalse(result['captureCompleted'])
+        self.assertFalse((self.output/'capture.bin').exists())
+        self.assertTrue(result['deviceStateUncertain'])
+
+    def test_failure_marker_during_capability_check_prevents_native_dispatch(self):
+        result=self.capture('cap-failure-marker-exit-zero')
+        self.assertEqual(result['outcome'],'native-diagnostic-refusal')
+        self.assertFalse(result['captureDispatchAttempted'])
+        self.assertFalse(result['recovery']['nativeDispatchOccurred'])
+        self.assertEqual(result['nativeDiagnosticCodes'],['handshake-protocol-refused'])
+        self.assertFalse((self.output/'work/capture.bin').exists())
+        self.assertEqual(len(result['processes']),1)
+
+    def test_pre_dispatch_refusal_does_not_certify_the_owners_boot_state(self):
+        result=self.capture('wrong-capabilities')
+        self.assertFalse(result['recovery']['nativeDispatchOccurred'])
+        self.assertTrue(result['recovery']['normalBootCheckRequired'])
+        self.assertFalse(result['recovery']['normalBootVerified'])
+        self.assertFalse(result['recovery']['automaticRetryAllowed'])
+        self.assertEqual(result['recovery']['action'],'inspect-preflight-and-confirm-normal-boot')
+
     def test_missing_short_or_oversized_outputs_never_complete(self):
         for index,mode in enumerate(('missing-output','short-output','long-output')):
             self.output=self.root/('case-'+str(index))
