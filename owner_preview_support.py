@@ -3,6 +3,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import shutil
 from pathlib import Path, PurePosixPath
 import stat
 import sys
@@ -10,6 +11,7 @@ import uuid
 
 # Filled by the owner-app builder; a raw source checkout has no bundled demo.
 PAYLOAD_MANIFEST_SHA256 = None
+PREVIEW_RESERVE_BYTES = 16 * 1024 * 1024
 
 
 def ordinary(path):
@@ -84,12 +86,9 @@ def verify_payload():
     return root
 
 
-def prepare_demo(output_parent=None):
-    """Generate a new sample review, never selecting or contacting a real robot."""
-    root = verify_payload()  # Validate all code/data before loading any module.
+def _output_parent(output_parent):
     if output_parent is None:
         parent = default_output_parent().absolute()
-        # Validate existing ancestors before creating the per-user result folder.
         ancestor = parent
         while not ancestor.exists():
             ancestor = ancestor.parent
@@ -100,6 +99,80 @@ def prepare_demo(output_parent=None):
     parent = ordinary(parent)
     if not parent.is_dir():
         raise ValueError('Choose an existing local result folder.')
+    return parent
+
+
+def _probe_result_folder(parent):
+    path = parent / ('.preview-check-' + uuid.uuid4().hex)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags |= getattr(os, 'O_BINARY', 0) | getattr(os, 'O_NOINHERIT', 0) | getattr(os, 'O_NOFOLLOW', 0)
+    created = False
+    fd = None
+    try:
+        fd = os.open(path, flags, 0o600)
+        created = True
+        if os.write(fd, b'x') != 1:
+            raise OSError('Could not complete local write check.')
+        os.close(fd)
+        fd = None
+        os.unlink(path)
+        created = False
+    finally:
+        try:
+            if fd is not None:
+                os.close(fd)
+        finally:
+            if created:
+                # A second cleanup attempt cannot turn a failed check into success.
+                try:
+                    os.unlink(path)
+                except OSError:
+                    pass
+
+
+def check_preview_setup(output_parent=None):
+    """Check only this computer's ability to generate the bundled sample."""
+    checks = []
+    available = None
+    try:
+        verify_payload()
+    except Exception:
+        checks.append(dict(id='bundled-example', status='failed', message='The bundled sample is missing or damaged. Get a fresh preview package.'))
+        checks.append(dict(id='results-folder', status='not-checked', message='The results folder was not checked.'))
+        checks.append(dict(id='sample-space', status='not-checked', message='Sample storage space was not checked.'))
+    else:
+        checks.append(dict(id='bundled-example', status='passed', message='The bundled sample is available.'))
+        try:
+            parent = _output_parent(output_parent)
+            _probe_result_folder(parent)
+        except Exception:
+            checks.append(dict(id='results-folder', status='failed', message='The results folder could not be checked. Choose a writable local folder or ask for help.'))
+            checks.append(dict(id='sample-space', status='not-checked', message='Sample storage space was not checked.'))
+        else:
+            checks.append(dict(id='results-folder', status='passed', message='The results folder is writable.'))
+            try:
+                available = shutil.disk_usage(parent).free
+                if type(available) is not int or available < 0:
+                    raise ValueError('Invalid free space.')
+                if available < PREVIEW_RESERVE_BYTES:
+                    checks.append(dict(id='sample-space', status='failed', message='Not enough free space for the sample preview.'))
+                else:
+                    checks.append(dict(id='sample-space', status='passed', message='There is enough free space for the sample preview.'))
+            except Exception:
+                available = None
+                checks.append(dict(id='sample-space', status='failed', message='Could not check free space for the sample preview.'))
+    ready = all(item['status'] == 'passed' for item in checks)
+    return dict(schema='jiborevival.preview-readiness.v1', scope='local-preview-only',
+                previewReady=ready, robotChecksPerformed=False, readyForApply=False,
+                availableBytes=available, checks=checks,
+                summary=('This computer is ready to create a sample preview. Your Jibo was not checked.'
+                         if ready else 'The sample preview needs attention. Your Jibo was not checked.'))
+
+
+def prepare_demo(output_parent=None):
+    """Generate a new sample review, never selecting or contacting a real robot."""
+    root = verify_payload()  # Validate all code/data before loading any module.
+    parent = _output_parent(output_parent)
     output = parent / ('sample-' + uuid.uuid4().hex)
     spec = importlib.util.spec_from_file_location('_owner_review_request', root / 'review_request.py')
     module = importlib.util.module_from_spec(spec)

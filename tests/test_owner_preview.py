@@ -9,6 +9,15 @@ from unittest import mock
 import owner_preview as preview
 
 
+def setup_result(ready=True):
+    return dict(schema='jiborevival.preview-readiness.v1', scope='local-preview-only',
+                previewReady=ready, robotChecksPerformed=False, readyForApply=False,
+                availableBytes=16 * 1024 * 1024,
+                checks=[dict(id=name, status='passed' if ready else 'failed', message='Sample-only check')
+                        for name in ('bundled-example', 'results-folder', 'sample-space')],
+                summary='The sample preview is ready.' if ready else 'Sample preview needs attention.')
+
+
 class PreviewControllerTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -21,12 +30,19 @@ class PreviewControllerTests(unittest.TestCase):
         self.good = {"reviewFile": str(self.report), "outputDir": str(self.output),
                      "summary": "Sample report", "syntheticDemo": True,
                      "readyForApply": False}
+        self.setup_patch = mock.patch.object(preview, 'check_preview', return_value=setup_result())
+        self.setup_patch.start()
+        self.addCleanup(self.setup_patch.stop)
 
     def test_five_steps_are_clear_and_bounded(self):
         self.assertEqual([x[0] for x in preview.STEPS], ["Check setup", "Connect Jibo", "Recovery copy", "Join service", "Verify"])
         controller = preview.PreviewController()
         controller.back()
         self.assertEqual(controller.step, 0)
+        controller.next()
+        self.assertEqual(controller.step, 0)
+        controller.begin_setup()
+        controller.complete_setup(setup_result())
         for _ in range(7):
             controller.next()
         self.assertEqual(controller.step, 4)
@@ -70,6 +86,8 @@ class PreviewControllerTests(unittest.TestCase):
         state = preview.PreviewController()
         with self.assertRaises(preview.PreviewError):
             state.begin()
+        state.begin_setup()
+        state.complete_setup(setup_result())
         for _ in range(4):
             state.next()
         state.begin()
@@ -99,6 +117,9 @@ class PreviewControllerTests(unittest.TestCase):
         saved = json.loads(receipt.read_text(encoding="utf-8"))
         self.assertIs(saved["syntheticDemo"], True)
         self.assertIs(saved["readyForApply"], False)
+        self.assertEqual(saved['previewCheckScope'], 'local-preview-only')
+        self.assertFalse(saved['robotChecksPerformed'])
+        self.assertNotIn('outputDir', saved)
         self.assertEqual(saved["reviewFile"], str(self.report))
 
     def test_existing_receipt_is_preserved_and_reports_failure(self):
@@ -123,6 +144,70 @@ class PreviewControllerTests(unittest.TestCase):
         with mock.patch.object(preview, "prepare_preview", side_effect=ValueError("sensitive test details")), contextlib.redirect_stderr(err):
             self.assertEqual(preview.main(["--smoke"]), 1)
         self.assertNotIn("sensitive test details", err.getvalue())
+
+    def test_failed_preflight_prevents_report_generation(self):
+        with mock.patch.object(preview, 'check_preview', return_value=setup_result(False)), \
+             mock.patch.object(preview, 'prepare_preview') as generate, contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(preview.main(['--smoke']), 1)
+        generate.assert_not_called()
+
+    def test_return_to_first_screen_requires_a_fresh_check(self):
+        state = preview.PreviewController()
+        state.begin_setup()
+        state.complete_setup(setup_result())
+        state.next()
+        self.assertEqual(state.step, 1)
+        state.back()
+        self.assertIsNone(state.setup_result)
+        state.next()
+        self.assertEqual(state.step, 0)
+        state.begin_setup()
+        state.complete_setup(setup_result(False))
+        state.next()
+        self.assertEqual(state.step, 0)
+
+    def test_stale_setup_completion_cannot_unlock_current_check(self):
+        state = preview.PreviewController()
+        old = state.begin_setup()
+        state.fail(old)
+        current = state.begin_setup()
+        state.complete_setup(setup_result(), old)
+        self.assertTrue(state.busy)
+        self.assertIsNone(state.setup_result)
+        state.complete_setup(setup_result(False), current)
+        state.next()
+        self.assertEqual(state.step, 0)
+
+    def test_setup_result_cannot_complete_a_report_operation(self):
+        state = preview.PreviewController()
+        state.begin_setup()
+        with self.assertRaises(preview.PreviewError):
+            state.complete(self.good)
+        self.assertTrue(state.busy)
+        state.complete_setup(setup_result())
+
+    def test_report_api_rechecks_before_calling_a_backend(self):
+        generate = mock.Mock(return_value=self.good)
+        with mock.patch.object(preview, 'check_preview', return_value=setup_result(False)):
+            with self.assertRaises(preview.PreviewError):
+                preview.prepare_preview(output_parent=self.parent, backend=generate)
+        generate.assert_not_called()
+
+
+class SetupResultProtocolTests(unittest.TestCase):
+    def test_valid_local_success_never_grants_robot_authority(self):
+        result = preview.validate_setup_result(setup_result())
+        self.assertFalse(result['robotChecksPerformed'])
+        self.assertFalse(result['readyForApply'])
+
+    def test_malformed_or_inconsistent_checks_are_rejected(self):
+        for patch in ({'scope': 'robot'}, {'schema': 'unknown'}, {'readyForApply': True},
+                      {'robotChecksPerformed': True}, {'previewReady': 1}, {'availableBytes': True},
+                      {'availableBytes': -1}, {'availableBytes': 16 * 1024 * 1024 - 1},
+                      {'checks': []}, {'summary': None}, {'previewReady': False},
+                      {'checks': [{'id': [], 'status': 'passed', 'message': 'bad'}] * 3}):
+            with self.subTest(patch=patch), self.assertRaises(preview.PreviewError):
+                preview.validate_setup_result({**setup_result(), **patch})
 
 
 if __name__ == "__main__":
