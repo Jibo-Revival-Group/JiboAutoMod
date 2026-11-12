@@ -1,0 +1,41 @@
+name: Owner preview application
+on:
+  push:
+    branches: [Dev]
+  pull_request:
+    branches: [Dev]
+permissions:
+  contents: read
+jobs:
+  packaged-preview:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04, macos-15-intel, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build tooling
+        run: python -m pip install -r tools/requirements-owner-preview-build.txt
+      - name: Test owner preview and backend boundaries
+        run: python -B -m unittest discover -s tests -p "test_owner_preview*.py"
+      - name: Check community documentation scope
+        run: python -B -m unittest discover -s tests -p test_community_scope.py
+      - name: Build and test packaged and extracted preview
+        shell: pwsh
+        run: |
+          python -B tools/build_owner_preview.py --source . --output "$env:RUNNER_TEMP/owner-preview" --source-revision '${{ github.sha }}' --freeze
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged owner preview failed.' }
+      - name: Retain tested candidate and receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: OwnerPreview-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/owner-preview/JiboRevival-Conversion-Preview-*
+            ${{ runner.temp }}/owner-preview/*-check.json
+            ${{ runner.temp }}/owner-preview/*-receipt.json
+          if-no-files-found: error

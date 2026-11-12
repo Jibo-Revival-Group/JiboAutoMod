@@ -1,6 +1,24 @@
 # Jibo Auto-Mod Tool
 
-This is a Jibo Revival community project for device access, recovery and conversion tooling. Documentation and releases cover these tools and generic examples. Keep private experiment notes and separate commercial platform plans outside this repository; see [contributing](CONTRIBUTING.md).
+## Start here: Jibo Revival Conversion Preview
+
+The owner preview is a guided demo with made-up information. It does not check
+your computer or Jibo, connect to a robot, make or check a recovery copy, join a
+service, or verify that a robot is ready. Real conversion, robot checks and device
+writes are unavailable.
+
+See the [owner preview guide](Docs/owner-preview.md) for the five sample screens
+and what each one does. The source preview entry point is `owner_preview.py`.
+Per-OS desktop packages are candidates, not verified releases. A packaged Windows
+version is intended to run without a separate Python installation; packaging and
+Windows, macOS and Linux support have not yet been verified. No release date is
+promised.
+
+The rest of this README links to technical references and preserves a clearly
+labelled historical guide for an older standalone version. Those sections do not
+add capabilities to the owner preview.
+
+## Technical references and current offline tools
 
 The optional [full-backup recovery-table audit](Docs/gpt-recovery-audit.md)
 now checks the protective MBR, both GPT headers and matching entry arrays.
@@ -30,7 +48,7 @@ For retained inputs that are already prepared, `review_request.py` generates the
 storage/outer manifests and builds that review in one command, with explicit
 partition choices and preserved pins. See the [one-command flow](Docs/conversion-review-bundle.md#one-command-request-and-review).
 
-**Automatically enable developer mode on Jibo robots**
+### Conversion planning and related offline evidence
 
 This repository contains Jibo access, recovery and conversion tooling. OS support
 depends on the entry point; native compilation, offline planning and physical
@@ -93,13 +111,14 @@ are not present in this Dev checkout. Do not copy those commands into this branc
 The remaining standalone-tool reference describes the older main implementation;
 it is retained for users of that version, not a Dev hardware-support claim.
 
-## ⚠️ Warning
+## Historical writer safety
 
-**USE AT YOUR OWN RISK!** This tool modifies your Jibo's internal storage. While the process is generally safe:
+The older standalone writer described below can change Jibo's internal storage.
+These instructions do not describe the current read-only preview.
 
-- **Always keep backups** - the tool creates them automatically
-- **Don't disconnect during write operations** - this could brick your Jibo
-- **Calibration data is unique** - your backup contains data specific to YOUR Jibo
+- Verify a robot-specific backup and recovery path before using that writer.
+- Keep power and the data cable connected until writing and verification finish.
+- Preserve calibration from the same robot; another robot's backup is not a substitute.
 
 ## Historical standalone quick start (older main)
 
