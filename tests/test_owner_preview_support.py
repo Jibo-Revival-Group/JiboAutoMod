@@ -47,6 +47,87 @@ class OwnerPreviewSupportTests(unittest.TestCase):
         self.addCleanup(self.patch_root.stop)
         self.addCleanup(self.patch_pin.stop)
 
+    def test_local_setup_success_checks_only_the_sample_and_cleans_probe(self):
+        output = self.root / "results"
+        output.mkdir()
+        with mock.patch.object(support.shutil, "disk_usage", return_value=types.SimpleNamespace(free=32 * 1024 * 1024)), \
+             mock.patch.object(support.importlib.util, "spec_from_file_location") as loader:
+            result = support.check_preview_setup(output)
+        loader.assert_not_called()
+        self.assertEqual(result["schema"], "jiborevival.preview-readiness.v1")
+        self.assertEqual(result["scope"], "local-preview-only")
+        self.assertIs(result["previewReady"], True)
+        self.assertIs(result["robotChecksPerformed"], False)
+        self.assertIs(result["readyForApply"], False)
+        self.assertEqual(result["availableBytes"], 32 * 1024 * 1024)
+        self.assertEqual([(c["id"], c["status"]) for c in result["checks"]],
+                         [("bundled-example", "passed"), ("results-folder", "passed"), ("sample-space", "passed")])
+        self.assertEqual(list(output.iterdir()), [])
+
+    def test_bad_sample_never_creates_or_probes_results_folder(self):
+        (self.payload_copy / "review_request.py").write_text("tampered", encoding="utf-8")
+        output = self.root / "should-not-exist"
+        with mock.patch.object(support, "default_output_parent", return_value=output), \
+             mock.patch.object(support, "_probe_result_folder") as probe:
+            result = support.check_preview_setup()
+        probe.assert_not_called()
+        self.assertFalse(output.exists())
+        self.assertIs(result["previewReady"], False)
+        self.assertEqual([c["status"] for c in result["checks"]], ["failed", "not-checked", "not-checked"])
+        self.assertIs(result["readyForApply"], False)
+
+    def test_readonly_and_cleanup_failure_fail_closed_without_private_details(self):
+        output = self.root / "results"
+        output.mkdir()
+        with mock.patch.object(support, "_probe_result_folder", side_effect=PermissionError("private filesystem detail")):
+            result = support.check_preview_setup(output)
+        self.assertEqual(result["checks"][1]["status"], "failed")
+        self.assertNotIn("private filesystem detail", json.dumps(result))
+        self.assertIs(result["previewReady"], False)
+        original_unlink = support.os.unlink
+        calls = []
+        def first_unlink_fails(path):
+            calls.append(path)
+            if len(calls) == 1:
+                raise PermissionError("private cleanup detail")
+            return original_unlink(path)
+        with mock.patch.object(support.os, "unlink", side_effect=first_unlink_fails):
+            result = support.check_preview_setup(output)
+        self.assertEqual(result["checks"][1]["status"], "failed")
+        self.assertIs(result["previewReady"], False)
+        self.assertGreaterEqual(len(calls), 2)
+        self.assertEqual(list(output.iterdir()), [])
+        self.assertNotIn("private cleanup detail", json.dumps(result))
+
+    def test_sample_space_low_and_unavailable_are_failures(self):
+        output = self.root / "results"
+        output.mkdir()
+        for free in (0, support.PREVIEW_RESERVE_BYTES - 1):
+            with self.subTest(free=free), mock.patch.object(support.shutil, "disk_usage", return_value=types.SimpleNamespace(free=free)):
+                result = support.check_preview_setup(output)
+            self.assertEqual(result["availableBytes"], free)
+            self.assertEqual(result["checks"][2]["status"], "failed")
+            self.assertIs(result["previewReady"], False)
+            self.assertIs(result["robotChecksPerformed"], False)
+            self.assertIs(result["readyForApply"], False)
+        with mock.patch.object(support.shutil, "disk_usage", side_effect=OSError("private disk detail")):
+            result = support.check_preview_setup(output)
+        self.assertIsNone(result["availableBytes"])
+        self.assertEqual(result["checks"][2]["status"], "failed")
+        self.assertNotIn("private disk detail", json.dumps(result))
+        self.assertEqual(list(output.iterdir()), [])
+
+    def test_first_local_check_creates_only_default_results_folder(self):
+        default = self.root / "fresh-state" / "JiboRevival" / "ConversionPreview"
+        with mock.patch.object(support, "default_output_parent", return_value=default), \
+             mock.patch.object(support.shutil, "disk_usage", return_value=types.SimpleNamespace(free=support.PREVIEW_RESERVE_BYTES)):
+            result = support.check_preview_setup()
+        self.assertIs(result["previewReady"], True)
+        self.assertTrue(default.is_dir())
+        self.assertEqual(list(default.iterdir()), [])
+        self.assertIs(result["robotChecksPerformed"], False)
+        self.assertIs(result["readyForApply"], False)
+
     def test_code_tamper_is_refused_before_loading_code(self):
         code = self.payload_copy / "review_request.py"
         code.write_text("raise RuntimeError('must not execute')\n", encoding="utf-8")

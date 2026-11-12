@@ -72,6 +72,10 @@ def smoke(executable, args, output, label):
     result = json.loads(receipt.read_bytes())
     if result.get('syntheticDemo') is not True or result.get('readyForApply') is not False:
         raise ValueError('Unexpected smoke capability.')
+    if (result.get('previewCheckScope') != 'local-preview-only' or
+            result.get('robotChecksPerformed') is not False or
+            result.get('localChecks') != {name: 'passed' for name in ('bundled-example', 'results-folder', 'sample-space')}):
+        raise ValueError('Packaged local preview checks did not pass.')
     report = Path(result['reviewFile'])
     if not report.is_file() or not report.is_relative_to(parent):
         raise ValueError('Smoke report is missing or outside result directory.')

@@ -13,7 +13,7 @@ import webbrowser
 from pathlib import Path
 
 STEPS = (
-    ("Check setup", "See how the journey works", "This is a demo using made-up information. It does not check your computer or Jibo. Real conversion is not available in this preview."),
+    ("Check setup", "Check this preview", "Check the bundled example files, the results folder and space for a sample report. This does not check your Jibo or space for a real backup. Real conversion is not available in this preview."),
     ("Connect Jibo", "Imagine connecting your Jibo", "For this demo, nothing is connected. A future supported tool would guide you through connecting your Jibo and checking compatibility."),
     ("Recovery copy", "See the recovery step", "The demo does not make or check a backup. Before any future changes, you would need a verified recovery copy for your own Jibo."),
     ("Join service", "Choose a service later", "No account is created and no service is contacted. A future conversion would let you choose a compatible service or your own setup."),
@@ -23,6 +23,36 @@ STEPS = (
 
 class PreviewError(ValueError):
     """A preview result did not meet the synthetic-only contract."""
+
+
+def validate_setup_result(result):
+    if (not isinstance(result, dict) or result.get('schema') != 'jiborevival.preview-readiness.v1' or
+            result.get('scope') != 'local-preview-only' or result.get('robotChecksPerformed') is not False or
+            result.get('readyForApply') is not False or type(result.get('previewReady')) is not bool):
+        raise PreviewError('The preview check could not be verified.')
+    checks = result.get('checks')
+    expected = {'bundled-example', 'results-folder', 'sample-space'}
+    if (not isinstance(checks, list) or len(checks) != 3 or
+            any(not isinstance(c, dict) or not isinstance(c.get('id'), str) or c.get('id') not in expected or
+                c.get('status') not in ('passed', 'failed', 'not-checked') or
+                not isinstance(c.get('message'), str) for c in checks) or
+            {c['id'] for c in checks} != expected):
+        raise PreviewError('The preview check could not be verified.')
+    passed = all(c['status'] == 'passed' for c in checks)
+    space = result.get('availableBytes')
+    if (result['previewReady'] != passed or
+            (space is not None and (type(space) is not int or space < 0)) or
+            (passed and (space is None or space < 16 * 1024 * 1024)) or
+            not isinstance(result.get('summary'), str) or len(result['summary']) > 600):
+        raise PreviewError('The preview check could not be verified.')
+    return result
+
+
+def check_preview(output_parent=None, backend=None):
+    if backend is None:
+        from owner_preview_support import check_preview_setup
+        backend = check_preview_setup
+    return validate_setup_result(backend(output_parent=output_parent))
 
 
 def validate_result(result, output_parent=None):
@@ -51,6 +81,8 @@ def validate_result(result, output_parent=None):
 
 
 def prepare_preview(output_parent=None, backend=None):
+    if not check_preview(output_parent=output_parent)['previewReady']:
+        raise PreviewError('The local preview is not ready.')
     validation_parent = output_parent
     if backend is None:
         from owner_preview_support import default_output_parent, prepare_demo
@@ -69,9 +101,13 @@ class PreviewController:
         self.busy = False
         self.result = None
         self.failed = False
+        self.setup_result = None
+        self.task = None
+        self.generation = 0
 
     def next(self):
-        if not self.busy and self.step < len(STEPS) - 1:
+        ready = self.setup_result and self.setup_result['previewReady']
+        if not self.busy and self.step < len(STEPS) - 1 and (self.step != 0 or ready):
             self.step += 1
             self.failed = False
 
@@ -79,6 +115,34 @@ class PreviewController:
         if not self.busy and self.step > 0:
             self.step -= 1
             self.failed = False
+            if self.step == 0:
+                self.setup_result = None
+                self.generation += 1
+
+    def begin_setup(self):
+        if self.busy or self.step != 0:
+            raise PreviewError('The preview check cannot start here.')
+        self.busy = True
+        self.failed = False
+        self.setup_result = None
+        self.task = 'setup'
+        self.generation += 1
+        return self.generation
+
+    def complete_setup(self, result, generation=None):
+        if generation is not None and generation != self.generation:
+            return
+        if not self.busy or self.task != 'setup':
+            raise PreviewError('No preview check is running.')
+        try:
+            self.setup_result = validate_setup_result(result)
+            self.failed = not self.setup_result['previewReady']
+        except (ValueError, OSError, RuntimeError):
+            self.failed = True
+            self.setup_result = None
+        finally:
+            self.busy = False
+            self.task = None
 
     def begin(self):
         if self.busy or self.step != len(STEPS) - 1:
@@ -86,9 +150,14 @@ class PreviewController:
         self.busy = True
         self.failed = False
         self.result = None
+        self.task = 'report'
+        self.generation += 1
+        return self.generation
 
-    def complete(self, result, output_parent=None):
-        if not self.busy:
+    def complete(self, result, output_parent=None, generation=None):
+        if generation is not None and generation != self.generation:
+            return
+        if not self.busy or self.task != 'report':
             raise PreviewError("No demo is running.")
         try:
             self.result = validate_result(result, output_parent)
@@ -97,12 +166,16 @@ class PreviewController:
             self.result = None
         finally:
             self.busy = False
+            self.task = None
 
-    def fail(self):
+    def fail(self, generation=None):
+        if generation is not None and generation != self.generation:
+            return
         if self.busy:
             self.busy = False
             self.failed = True
             self.result = None
+            self.task = None
 
 
 def launch():
@@ -166,17 +239,19 @@ def launch():
         description.configure(text=detail)
         back.configure(state="disabled" if state.step == 0 or state.busy else "normal")
         if state.busy:
-            status.configure(text="Creating the sample report…")
+            status.configure(text="Checking the local preview…" if state.task == 'setup' else "Creating the sample report…")
             forward.configure(text="Please wait", state="disabled")
         elif state.failed:
-            status.configure(text="The demo could not be created. Please try again or ask for help. Your Jibo was not changed.")
+            detail = (next((c['message'] for c in state.setup_result['checks'] if c['status'] == 'failed'), state.setup_result['summary'])
+                      if state.step == 0 and state.setup_result else "The preview could not finish. Please try again or ask for help. Your Jibo was not changed.")
+            status.configure(text=detail)
             forward.configure(text="Try again", state="normal")
         elif state.result and state.step == len(STEPS) - 1:
             status.configure(text="Demo report ready. This is sample data; your Jibo was not checked or changed. Keep the report private.")
             forward.configure(text="Create another demo", state="normal")
         else:
-            status.configure(text="")
-            forward.configure(text=("Try demo" if state.step == 0 else "Create demo report" if state.step == len(STEPS) - 1 else "Continue"), state="normal")
+            status.configure(text=state.setup_result['summary'] if state.step == 0 and state.setup_result else "")
+            forward.configure(text=("Continue" if state.step == 0 and state.setup_result else "Check preview" if state.step == 0 else "Create demo report" if state.step == len(STEPS) - 1 else "Continue"), state="normal")
         if state.result and state.step == len(STEPS) - 1 and not state.busy:
             report.pack(side="right", padx=(0, 10))
         else:
@@ -187,17 +262,29 @@ def launch():
         show()
 
     def advance():
+        if state.busy:
+            return
+        if state.step == 0 and not (state.setup_result and state.setup_result['previewReady']):
+            generation = state.begin_setup()
+            show()
+            def setup_worker():
+                try:
+                    messages.put(('setup', generation, True, check_preview()))
+                except Exception:
+                    messages.put(('setup', generation, False, None))
+            threading.Thread(target=setup_worker, daemon=True).start()
+            return
         if state.step < len(STEPS) - 1:
             state.next()
             show()
             return
-        state.begin()
+        generation = state.begin()
         show()
         def worker():
             try:
-                messages.put((True, prepare_preview()))
+                messages.put(('report', generation, True, prepare_preview()))
             except Exception:
-                messages.put((False, None))
+                messages.put(('report', generation, False, None))
         threading.Thread(target=worker, daemon=True).start()
 
     def open_report():
@@ -213,8 +300,13 @@ def launch():
             return
         try:
             while True:
-                ok, result = messages.get_nowait()
-                state.complete(result) if ok else state.fail()
+                kind, generation, ok, result = messages.get_nowait()
+                if not ok:
+                    state.fail(generation)
+                elif kind == 'setup':
+                    state.complete_setup(result, generation)
+                else:
+                    state.complete(result, generation=generation)
                 show()
         except queue.Empty:
             pass
@@ -232,7 +324,7 @@ def launch():
 
 
 
-def write_smoke_receipt(path, result):
+def write_smoke_receipt(path, result, setup=None):
     """Create a new receipt in an existing, ordinary directory."""
     path = Path(path).absolute()
     parent = path.parent
@@ -245,7 +337,14 @@ def write_smoke_receipt(path, result):
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     flags |= getattr(os, "O_BINARY", 0) | getattr(os, "O_NOINHERIT", 0) | getattr(os, "O_NOFOLLOW", 0)
     payload = {"syntheticDemo": True, "readyForApply": False,
-               "reviewFile": result["reviewFile"], "outputDir": result["outputDir"]}
+               "reviewFile": result["reviewFile"]}
+    if setup is not None:
+        checked = validate_setup_result(setup)
+        if not checked['previewReady']:
+            raise PreviewError('The local preview is not ready.')
+        payload['previewCheckScope'] = checked['scope']
+        payload['robotChecksPerformed'] = checked['robotChecksPerformed']
+        payload['localChecks'] = {c['id']: c['status'] for c in checked['checks']}
     fd = os.open(path, flags, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as stream:
         json.dump(payload, stream)
@@ -267,9 +366,12 @@ def main(argv=None):
         parser.error("--output-parent and --receipt require --smoke")
     if args.smoke:
         try:
+            setup = check_preview(output_parent=args.output_parent)
+            if not setup['previewReady']:
+                raise PreviewError('The local preview is not ready.')
             result = prepare_preview(output_parent=args.output_parent)
             if args.receipt:
-                write_smoke_receipt(args.receipt, result)
+                write_smoke_receipt(args.receipt, result, setup)
         except Exception:
             safe_message("The synthetic preview could not be created. Please ask for help.", sys.stderr)
             return 1
