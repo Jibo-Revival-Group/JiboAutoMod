@@ -42,8 +42,9 @@ choose the one for your computer:
 
 ## Candidate status and help
 
-The Windows candidate's frozen and extracted launch checks passed, including a
-check without Python installed. macOS and Linux package checks are still pending.
+The Windows candidate's frozen and extracted checks passed using its bundled
+Python runtime. Other platform candidates are offered only after their matching
+build and launch checks pass. These checks cover the sample app, not a robot.
 Candidate packages are unsigned, and the macOS app is not notarized. If your
 computer blocks an app or shows a security warning, stop and send the message to
 the project maintainers. Do not turn off security settings or bypass the warning.

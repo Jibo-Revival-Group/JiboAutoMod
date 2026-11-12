@@ -13,7 +13,7 @@ class PreviewControllerTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.parent = Path(self.temp.name)
+        self.parent = Path(self.temp.name).resolve()
         self.output = self.parent / "demo-001"
         self.output.mkdir()
         self.report = self.output / "review.html"

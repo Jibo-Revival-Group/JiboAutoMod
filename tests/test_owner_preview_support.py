@@ -22,7 +22,7 @@ class OwnerPreviewSupportTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.stage_temp = tempfile.TemporaryDirectory(prefix="owner-preview-fixture-")
-        root = Path(cls.stage_temp.name)
+        root = Path(cls.stage_temp.name).resolve()
         spec = importlib.util.spec_from_file_location("_owner_fixture_builder", ROOT / "tools" / "build_owner_preview.py")
         builder = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(builder)
@@ -36,7 +36,7 @@ class OwnerPreviewSupportTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="owner-preview-case-")
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.payload_copy = self.root / "payload"
         shutil.copytree(self.payload, self.payload_copy)
         self.pin = hashlib.sha256((self.payload_copy / "release-manifest.json").read_bytes()).hexdigest()
