@@ -76,6 +76,13 @@ Its [process cleanup](Docs/capture-process-cleanup.md) preserves the primary
 failure and reports cleanup failures separately; a successful process exit with
 failed cleanup cannot admit capture data.
 
+The separate [full user-area backup profile](Docs/full-storage-backup.md) uses
+retained EXT_CSD capacity evidence, rechecks the live capacity before image READ
+commands, and verifies a private `full-storage.bin` output. It requires its own
+reviewed bundle, destination space and attended device window. This experimental
+acquisition path is separate from the guided owner demo; physical qualification
+and restoration remain outstanding.
+
 [Capture candidate preparation](Docs/capture-candidate.md) joins a Windows static
 DLL export and an actual ARM payload from the same CI revision into a pinned,
 fixed review plan. It launches no native process. A separate offline receipt

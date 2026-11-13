@@ -101,7 +101,7 @@ def main():
     assert set(intake['credentialObservation']['fields'].values())=={'blank'}
     assert b'Synthetic demo' in (root/'intake-result/intake.html').read_bytes()
     assert before=={name:sha((extracted/name).read_bytes()) for name in names}
-    for script in ('review_request.py','conversion_review.py','storage_evidence.py','oobe_intake.py','gpt_recovery.py','capture_adapter.py','demo_review.py'):
+    for script in ('review_request.py','conversion_review.py','storage_evidence.py','oobe_intake.py','gpt_recovery.py','capture_adapter.py','demo_review.py','storage_capacity.py'):
         help_run=subprocess.run([sys.executable,'-I','-B',str(extracted/script),'--help'],cwd=root,capture_output=True,timeout=10)
         assert help_run.returncode==0,help_run.stderr
     proof=dict(schema='openjibo.offline-review-release-check.v1',sourceRevision=args.source_revision,archiveSha256=sha(raw),

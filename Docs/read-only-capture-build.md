@@ -32,7 +32,7 @@ file admission, output creation or USB discovery. They do not authenticate a bui
 
 ## Command and protocol boundary
 
-Capture admits only `EMMC_STATUS`, `EMMC_READ` and `EMMC_READ_EXT_CSD`, with an
+The original short capture profile admits `EMMC_STATUS`, `EMMC_READ` and `EMMC_READ_EXT_CSD`, with an
 internal EXIT back to RCM. Capture commands require a separately reviewed device
 window and exact capture plan; none was run against hardware in this change.
 
@@ -42,6 +42,14 @@ ranges of 1–4,096 sectors, 512 bytes each, below `0x1D60000` sectors. That inh
 Jibo geometry is an admission upper bound, not measured capacity. Status/EXT_CSD/
 EXIT require zero range fields. Legacy and unknown opcodes do not dispatch storage
 operations in the restricted payload.
+
+The separate [full user-area profile](full-storage-backup.md) adds the host action
+`EMMC_READ_FULL expected_sector_count new_file` and a `--full-capabilities`
+inspection flag. The host measures EXT_CSD capacity and requires the exact planned
+count before issuing repeated image READ commands; the existing startup handshake
+can already have read sector zero. It adds no payload command,
+write/erase handler or general-purpose fallback. Full progress is limited to
+101 percentage lines. The original `--capabilities` v1 response is unchanged.
 
 Host ranges are strict hexadecimal (optional `0x`), without signs, whitespace,
 trailing text, zero count or overflow. Only the Jibo VID/PID is selected; there is

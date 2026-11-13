@@ -32,6 +32,7 @@ def main():
         if result.returncode != 0: raise SystemExit('Native fixture compilation failed.\n'+result.stderr)
         return executable
     host = compile_program('readonly-host-fixture', [native/'exploit/shofel2_t124.c', root/'tests/native/readonly_usb_stub.c'])
+    full_host = compile_program('readonly-host-full', [native/'exploit/shofel2_t124.c', root/'tests/native/readonly_usb_stub.c'], extra=['-DREADONLY_FIXTURE_DEFAULT_MODE="full-good"'])
     failure_hosts = {}
     for mode in ('handshake-command-failure','handshake-reply-failure','init-failure'):
         failure_hosts[mode] = compile_program('readonly-host-'+mode,
@@ -61,6 +62,12 @@ def main():
     assert capabilities['commands'] == ['EMMC_STATUS', 'EMMC_READ', 'EMMC_READ_EXT_CSD']
     assert capabilities['protocol'] == 'openjibo-emmc-readonly.v1' and capabilities['maxReadSectors'] == 4096
     invoke(['--help'], success=True)
+    full_capabilities = json.loads(invoke(['--full-capabilities'], success=True).stdout)
+    assert full_capabilities == dict(schema='openjibo.storage-readonly-full-capabilities.v1',
+        protocol='openjibo-emmc-readonly.v1',command='EMMC_READ_FULL',sectorSizeBytes=512,
+        maxReadSectors=4096,storageSectorUpperBound=0x1D60000,capacitySource='EXT_CSD.SEC_COUNT')
+    for value in ('0','1d60001','100000000','-1','+1','0x','1garbage',''):
+        invoke(['EMMC_READ_FULL',value,'invalid-full.bin'])
     for operation in ('EMMC_WRITE', 'EMMC_ERASE', 'MEM_DUMP', 'READ_FUSES', 'BOOT_BCT', 'PAYLOAD', 'DUMP_STACK', '-dbg', '--unknown'):
         invoke([operation]); invoke([operation, '0', '1', 'ignored'])
     invoke([]); invoke(['EMMC_STATUS', 'extra'])
@@ -78,12 +85,37 @@ def main():
     preserved = output/'preserved.bin'; preserved.write_bytes(b'keep original')
     invoke(['EMMC_READ','0','1',str(preserved)])
     assert preserved.read_bytes() == b'keep original'
+    invoke(['EMMC_READ_FULL','1009',str(preserved)])
+    assert preserved.read_bytes() == b'keep original'
     invoke(['EMMC_STATUS'], usb=True, success=True)
     invoke(['EMMC_STATUS'], mode='clock-warning', usb=True, success=True)
     for index, (start, count) in enumerate([(0,9), (0,4096), (0x1D5FFFF,1)]):
         path = output/('read-'+str(index)+'.bin')
         invoke(['EMMC_READ',hex(start),hex(count),str(path)], usb=True, success=True)
         assert path.read_bytes() == b'\x5A'*(count*512)
+    full = output/'full-synthetic.bin'
+    result=invoke(['EMMC_READ_FULL','1009',str(full)],mode='full-good',usb=True,success=True)
+    assert full.stat().st_size==4105*512 and full.read_bytes()==b'\x5A'*(4105*512)
+    assert 'USB_FIXTURE_FULL_STORAGE_READS=2\n' in result.stderr
+    progress=[line for line in result.stdout.splitlines() if line.startswith('FULL_READ_PERCENT=')]
+    assert len(progress)<=101 and progress[-1]=='FULL_READ_PERCENT=100'
+    for mode, expected, code in (
+        ('full-capacity-zero','1009','full-capacity-invalid'),
+        ('full-capacity-too-large','1009','full-capacity-invalid'),
+        ('full-mismatch','1008','full-capacity-mismatch'),
+        ('full-capacity-command-failure','1009','full-capacity-command-failed'),
+        ('full-capacity-frame-failure','1009','full-capacity-frame-refused'),
+        ('full-capacity-data-failure','1009','full-capacity-data-failed'),
+        ('full-read-command-failure','1009','full-read-command-failed'),
+        ('full-read-frame-failure','1009','full-read-frame-refused'),
+        ('full-read-data-failure','1009','full-read-data-failed')):
+        target=output/(mode+'.bin'); result=invoke(['EMMC_READ_FULL',expected,str(target)],mode=mode,usb=True)
+        assert target.stat().st_size==0 and 'OPENJIBO_CAPTURE_DIAGNOSTIC='+code+'\n' in result.stderr
+        if mode.startswith('full-capacity-') or mode=='full-mismatch':
+            assert 'USB_FIXTURE_FULL_STORAGE_READS=0\n' in result.stderr
+    full_exit=output/'full-exit-failure.bin'
+    result=invoke(['EMMC_READ_FULL','1009',str(full_exit)],mode='full-exit-failure',usb=True)
+    assert full_exit.stat().st_size==4105*512 and 'OPENJIBO_CAPTURE_DIAGNOSTIC=exit-transfer-failed\n' in result.stderr
     ext = output/'ext-csd.bin'
     invoke(['EMMC_READ_EXT_CSD',str(ext)], usb=True, success=True)
     assert ext.read_bytes() == b'\x5A'*512
@@ -120,7 +152,7 @@ def main():
         actual = run([args.real_host.absolute(), '--capabilities'])
         assert actual.returncode == 0 and json.loads(actual.stdout) == capabilities
     sources = output/'reviewed-source'; sources.mkdir()
-    files = [host,policy,legacy,*failure_hosts.values()]
+    files = [host,full_host,policy,legacy,*failure_hosts.values()]
     for source in (native/'exploit/shofel2_t124.c',native/'payloads/emmc_server.c',native/'include/emmc_server.h'):
         copied = sources/source.name; shutil.copyfile(source,copied); files.append(copied)
     for source in (root/'tests/native/readonly_usb_stub.c',root/'tests/native/readonly_policy.c',
