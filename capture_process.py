@@ -92,6 +92,9 @@ DIAGNOSTIC_CODES = frozenset((
     'handshake-limits-refused', 'handshake-controller-uninitialized',
     'handshake-sector-zero-read-failed', 'handshake-startup-status-refused',
     'exit-transfer-failed',
+    'full-capacity-command-failed', 'full-capacity-frame-refused', 'full-capacity-data-failed',
+    'full-capacity-invalid', 'full-capacity-mismatch', 'full-read-command-failed',
+    'full-read-frame-refused', 'full-read-data-failed', 'full-output-write-failed', 'full-output-sync-failed',
 ))
 DIAGNOSTIC_LINES = {b'OPENJIBO_CAPTURE_DIAGNOSTIC='+code.encode('ascii'): code
                     for code in DIAGNOSTIC_CODES}

@@ -49,7 +49,10 @@ The plan has exactly `schema` (`openjibo.readonly-capture-plan.v1`),
 - `primary-gpt-prefix`: start zero and 34–4,096 sectors of 512 bytes.
 - `ext-csd`: start zero and count one, producing 512 bytes.
 
-Timeout is an integer from 1–60 seconds. There is no arbitrary offset, executable,
+Timeout for these v1 plans is an integer from 1–60 seconds. The separate
+[full user-area backup profile](full-storage-backup.md) uses a distinct schema,
+measured capacity evidence, destination admission and a longer bounded window.
+There is no arbitrary offset, executable,
 argument string, operation or write mode. Inputs cannot widen native protocol caps.
 
 ## Inspect, then explicitly capture

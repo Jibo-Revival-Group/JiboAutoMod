@@ -8,7 +8,10 @@ import json
 import os
 from pathlib import Path
 import platform
+import posixpath
 import re
+import shutil
+import subprocess
 import stat
 import time
 
@@ -59,16 +62,25 @@ def pinned_json(path, expected):
 def validate_profile(manifest, plan, manifest_pin, plan_pin, system, arch):
     require(type(manifest_pin) is str and P.HASH.fullmatch(manifest_pin) and type(plan_pin) is str and P.HASH.fullmatch(plan_pin))
     P.exact(manifest, ('schema','sourceRevision','os','architecture','protocol','files'), 'manifest_fields')
-    P.exact(plan, ('schema','sourceRevision','bundleSha256','kind','startSector','sectorCount','timeoutSeconds'), 'plan_fields')
-    require(manifest['schema'] == 'openjibo.readonly-capture-bundle.v1' and plan['schema'] == 'openjibo.readonly-capture-plan.v1')
+    require(type(plan) is dict)
+    full = plan.get('schema') == 'openjibo.readonly-full-storage-plan.v1'
+    fields = ('schema','sourceRevision','bundleSha256','kind','startSector','sectorCount','timeoutSeconds')
+    P.exact(plan, fields + (('capacityEvidence',) if full else ()), 'plan_fields')
+    require(manifest['schema'] == 'openjibo.readonly-capture-bundle.v1' and (full or plan['schema'] == 'openjibo.readonly-capture-plan.v1'))
     require(type(manifest['sourceRevision']) is str and re.fullmatch(r'[0-9a-f]{40}', manifest['sourceRevision']))
     require(plan['sourceRevision'] == manifest['sourceRevision'] and plan['bundleSha256'] == manifest_pin)
     require(system in ('windows','linux','macos') and arch in ('x86_64','arm64'))
     require(manifest['os'] == system and manifest['architecture'] == arch and manifest['protocol'] == PROTOCOL)
-    require(type(plan['timeoutSeconds']) is int and 1 <= plan['timeoutSeconds'] <= 60)
+    require(type(plan['timeoutSeconds']) is int and 1 <= plan['timeoutSeconds'] <= (21600 if full else 60))
     require(type(plan['startSector']) is int and plan['startSector'] == 0 and type(plan['sectorCount']) is int)
-    require((plan['kind'] == 'primary-gpt-prefix' and 34 <= plan['sectorCount'] <= MAX_READ) or
-            (plan['kind'] == 'ext-csd' and plan['sectorCount'] == 1))
+    if full:
+        require(plan['kind'] == 'full-user-area' and 0 < plan['sectorCount'] <= UPPER_SECTORS)
+        evidence = plan['capacityEvidence']
+        sibling('storage_capacity').validate_evidence(evidence)
+        require(evidence['storageSectorCount'] == plan['sectorCount'] and evidence['sizeBytes'] == plan['sectorCount']*512)
+    else:
+        require((plan['kind'] == 'primary-gpt-prefix' and 34 <= plan['sectorCount'] <= MAX_READ) or
+                (plan['kind'] == 'ext-csd' and plan['sectorCount'] == 1))
     require(type(manifest['files']) is list and 3 <= len(manifest['files']) <= 19)
     names = set(); roles = set(); total = 0
     fixed = dict(host='shofel2_t124_readonly.exe' if system == 'windows' else 'shofel2_t124_readonly',
@@ -94,7 +106,7 @@ def validate_profile(manifest, plan, manifest_pin, plan_pin, system, arch):
                     (system == 'linux' and re.search(r'\.so(?:\.[0-9]+)*$', name)))
     require(roles == set(fixed))
     return dict(manifest=manifest, plan=plan, manifestSha256=manifest_pin, planSha256=plan_pin,
-                host=fixed['host'], expectedBytes=plan['sectorCount']*512)
+                host=fixed['host'], expectedBytes=plan['sectorCount']*512, full=full, componentBytes=total)
 
 
 def validate(manifest, plan, manifest_pin, plan_pin):
@@ -138,14 +150,89 @@ def inputs(manifest_path, manifest_pin, plan_path, plan_pin):
     return validate(pinned_json(manifest_path, manifest_pin), pinned_json(plan_path, plan_pin), manifest_pin, plan_pin)
 
 
-def inspect(manifest_path, manifest_pin, plan_path, plan_pin, bundle):
+def inspect(manifest_path, manifest_pin, plan_path, plan_pin, bundle, output=None):
     admitted = inputs(manifest_path, manifest_pin, plan_path, plan_pin)
     deadline = time.monotonic()+admitted['plan']['timeoutSeconds']
     bundle = R.ordinary_path(bundle); require(bundle.is_dir())
     for item in admitted['manifest']['files']: check_file(bundle/item['name'], item, deadline, None)
-    return dict(schema='openjibo.readonly-capture-inspection.v1', bundleSha256=manifest_pin, planSha256=plan_pin,
+    result = dict(schema='openjibo.readonly-capture-inspection.v1', bundleSha256=manifest_pin, planSha256=plan_pin,
                 fileHashesMatched=True, inputTrust='operator-pinned-not-provenance-authenticated',
                 processLaunched=False, deviceIdentityVerified=False, readyForApply=False)
+    if admitted['full']:
+        require(output is not None); result['destinationBudget'] = destination_budget(output, admitted)
+    else: require(output is None)
+    return result
+
+
+def linux_mount_type(parent, text):
+    """Best-effort read-only mount metadata; unknown layouts remain unverified."""
+    selected=None
+    for line in text.splitlines():
+        left,sep,right=line.partition(' - ')
+        if not sep: continue
+        fields=left.split(); tail=right.split()
+        if len(fields)<5 or not tail: continue
+        mount=re.sub(r'\\([0-7]{3})',lambda m:chr(int(m.group(1),8)),fields[4])
+        if not mount.startswith('/'): continue
+        try: matches=posixpath.commonpath((str(parent),mount))==mount
+        except ValueError: continue
+        if matches and (selected is None or len(mount)>len(selected[0])):
+            selected=(mount,tail[0].lower())
+    return selected[1] if selected else None
+
+
+def known_small_file_limit(parent, expected_bytes):
+    # Windows reports FAT32 when available; unknown filesystems are not certified.
+    if expected_bytes < 2**32: return False
+    if platform.system() == 'Linux':
+        try:
+            with open('/proc/self/mountinfo','r',encoding='utf-8',errors='replace') as source: text=source.read(4*1024*1024+1)
+            if len(text)>4*1024*1024: return False
+            return linux_mount_type(parent,text) in ('vfat','msdos','fat','fat32')
+        except OSError: return False
+    if os.name != 'nt': return False
+    import ctypes
+    from ctypes import wintypes
+    api=ctypes.WinDLL('kernel32',use_last_error=True)
+    root=ctypes.create_unicode_buffer(32768); name=ctypes.create_unicode_buffer(256)
+    api.GetVolumePathNameW.argtypes=[wintypes.LPCWSTR,wintypes.LPWSTR,wintypes.DWORD]
+    api.GetVolumePathNameW.restype=wintypes.BOOL
+    api.GetVolumeInformationW.argtypes=[wintypes.LPCWSTR,wintypes.LPWSTR,wintypes.DWORD,ctypes.c_void_p,ctypes.c_void_p,ctypes.c_void_p,wintypes.LPWSTR,wintypes.DWORD]
+    api.GetVolumeInformationW.restype=wintypes.BOOL
+    if not api.GetVolumePathNameW(str(parent),root,len(root)): return False
+    if not api.GetVolumeInformationW(root,None,0,None,None,None,name,len(name)): return False
+    return name.value.upper() in ('FAT','FAT32')
+
+
+def destination_budget(output, admitted):
+    text=str(output); require(not text.startswith(('\\\\','//')))
+    if os.name=='nt': require(':' not in text[2:])
+    output=Path(output).absolute(); parent=R.ordinary_path(output.parent)
+    require(parent.is_dir() and not os.path.lexists(output))
+    require(not known_small_file_limit(parent, admitted['expectedBytes']))
+    required=2*admitted['expectedBytes']+admitted['componentBytes']+64*1024*1024
+    free=shutil.disk_usage(parent).free
+    require(type(free) is int and free>=required)
+    return dict(requiredBytes=required,availableBytes=free,hostCopies=2,
+                physicalReads=1,fileSizeSupportVerified=False)
+
+
+def secure_full_output(output):
+    if os.name != 'nt':
+        os.chmod(output,0o700); require(stat.S_IMODE(output.stat().st_mode)==0o700); return
+    env=os.environ.copy(); env['JIBO_FULL_CAPTURE_DIR']=str(output)
+    script="""$ErrorActionPreference='Stop'; $d=New-Object System.IO.DirectoryInfo($env:JIBO_FULL_CAPTURE_DIR); $a=New-Object System.Security.AccessControl.DirectorySecurity; $a.SetAccessRuleProtection($true,$false); $sid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User; $rule=New-Object System.Security.AccessControl.FileSystemAccessRule($sid,'FullControl','ContainerInherit,ObjectInherit','None','Allow'); $a.AddAccessRule($rule); $d.SetAccessControl($a); $v=$d.GetAccessControl(); $r=@($v.Access); if(-not $v.AreAccessRulesProtected -or $r.Count -ne 1 -or $r[0].IsInherited -or $r[0].AccessControlType -ne 'Allow' -or $r[0].IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -ne $sid.Value -or $r[0].FileSystemRights -ne [System.Security.AccessControl.FileSystemRights]::FullControl -or $r[0].InheritanceFlags -ne ([System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit) -or $r[0].PropagationFlags -ne [System.Security.AccessControl.PropagationFlags]::None){exit 1}"""
+    try: subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-Command',script],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=True,timeout=15)
+    except (OSError,subprocess.SubprocessError): raise CaptureFailure('private-output-unavailable') from None
+
+
+def sync_local_file(path):
+    path=R.ordinary_path(path); original=path.lstat(); require(stat.S_ISREG(original.st_mode))
+    fd=os.open(str(path),os.O_RDWR|getattr(os,'O_BINARY',0)|getattr(os,'O_NOFOLLOW',0))
+    try:
+        before=os.fstat(fd); require(R.file_identity(before)==R.file_identity(original)); os.fsync(fd)
+        require(R.identity(before)==R.identity(os.fstat(fd)))
+    finally: os.close(fd)
 
 
 def environment(work):
@@ -170,6 +257,15 @@ def capabilities(raw):
         storageSectorUpperBound=UPPER_SECTORS,payload='emmc_server_readonly.bin'))
 
 
+def full_capabilities(raw):
+    value=json.loads(raw.decode('utf-8'),object_pairs_hook=P.no_duplicates,parse_constant=lambda _:require(False))
+    P.exact(value,('schema','protocol','command','sectorSizeBytes','maxReadSectors','storageSectorUpperBound','capacitySource'),'full_capabilities_fields')
+    require(all(type(value[key]) is int for key in ('sectorSizeBytes','maxReadSectors','storageSectorUpperBound')))
+    require(value==dict(schema='openjibo.storage-readonly-full-capabilities.v1',protocol=PROTOCOL,
+        command='EMMC_READ_FULL',sectorSizeBytes=512,maxReadSectors=MAX_READ,
+        storageSectorUpperBound=UPPER_SECTORS,capacitySource='EXT_CSD.SEC_COUNT'))
+
+
 def diagnostic_codes(processes):
     return sorted({code for process in processes for stream in ('stdout', 'stderr')
                    for code in (process.get(stream) or {}).get('diagnosticCodes', [])
@@ -181,8 +277,11 @@ def capture(manifest_path, manifest_pin, plan_path, plan_pin, bundle, output, ca
     deadline = time.monotonic()+admitted['plan']['timeoutSeconds']
     bundle = R.ordinary_path(bundle); require(bundle.is_dir())
     for item in admitted['manifest']['files']: check_file(bundle/item['name'], item, deadline, cancellation)
+    if admitted['full']: budget=destination_budget(output,admitted)
     output = Path(output).absolute(); R.ordinary_path(output.parent)
     output.mkdir(mode=0o700, exist_ok=False)
+    if admitted['full']:
+        R.ordinary_path(output); secure_full_output(output)
     work = output/'work'; work.mkdir(mode=0o700)
     data = work/'capture.bin'
     receipt = dict(schema='openjibo.readonly-capture-receipt.v1',bundleSha256=manifest_pin,planSha256=plan_pin,
@@ -197,18 +296,24 @@ def capture(manifest_path, manifest_pin, plan_path, plan_pin, bundle, output, ca
         supervisorSha256=hashlib.sha256(Path(N.__file__).read_bytes()).hexdigest(),
         recoveryCheckerSha256=hashlib.sha256(Path(R.__file__).read_bytes()).hexdigest(),
         preparationParserSha256=hashlib.sha256(Path(P.__file__).read_bytes()).hexdigest())
+    if admitted['full']:
+        receipt.update(capacityEvidenceSha256=P.digest(admitted['plan']['capacityEvidence']),
+            capacitySourceSha256=admitted['plan']['capacityEvidence']['sourceHash'],destinationBudget=budget,
+            physicalIdentityVerified=False,restoreVerified=False,independentFinalRehash=False)
     try:
         for item in admitted['manifest']['files']:
             check_file(bundle/item['name'],item,deadline,cancellation,work/item['name'])
         host = work/admitted['host']; host.chmod(0o700)
         child_env = environment(work)
-        cap = N.run([host,'--capabilities'],work,child_env,deadline,cancellation,capabilities=True)
+        cap = N.run([host,'--full-capabilities' if admitted['full'] else '--capabilities'],work,child_env,deadline,cancellation,capabilities=True)
         receipt['processes'].append(cap['summary'])
         if diagnostic_codes(receipt['processes']): raise CaptureFailure('native-diagnostic-refusal')
-        try: capabilities(cap['stdout'])
+        try: (full_capabilities if admitted['full'] else capabilities)(cap['stdout'])
         except (ValueError, UnicodeError, CaptureFailure, RecursionError): raise CaptureFailure('capabilities-rejected') from None
         for item in admitted['manifest']['files']: check_file(work/item['name'],item,deadline,cancellation)
-        argv = [host,'EMMC_READ','0x0',hex(admitted['plan']['sectorCount']),'capture.bin'] if admitted['plan']['kind']=='primary-gpt-prefix' else [host,'EMMC_READ_EXT_CSD','capture.bin']
+        argv = ([host,'EMMC_READ_FULL',hex(admitted['plan']['sectorCount']),'capture.bin'] if admitted['full'] else
+                [host,'EMMC_READ','0x0',hex(admitted['plan']['sectorCount']),'capture.bin'] if admitted['plan']['kind']=='primary-gpt-prefix' else
+                [host,'EMMC_READ_EXT_CSD','capture.bin'])
         check_budget(deadline,cancellation); receipt['captureDispatchAttempted'] = True
         done = N.run(argv,work,child_env,deadline,cancellation,output=data,expected_size=admitted['expectedBytes'])
         receipt['processes'].append(done['summary'])
@@ -216,12 +321,17 @@ def capture(manifest_path, manifest_pin, plan_path, plan_pin, bundle, output, ca
         check_budget(deadline,cancellation)
         info = R.ordinary_path(data).lstat()
         require(stat.S_ISREG(info.st_mode) and info.st_size == admitted['expectedBytes'])
+        if admitted['full']: sync_local_file(data)
         expected = dict(sizeBytes=admitted['expectedBytes'],sha256=check_file(data,dict(sizeBytes=admitted['expectedBytes']),deadline,cancellation))
         for item in admitted['manifest']['files']: check_file(work/item['name'],item,deadline,cancellation)
         check_budget(deadline,cancellation)
-        check_file(data,expected,deadline,cancellation,output/'capture.bin')
+        final_name='full-storage.bin' if admitted['full'] else 'capture.bin'
+        check_file(data,expected,deadline,cancellation,output/final_name)
+        if admitted['full']:
+            check_file(output/final_name,expected,deadline,cancellation)
+            receipt['independentFinalRehash']=True
         check_budget(deadline,cancellation)
-        receipt.update(outcome='completed',captureCompleted=True,artifact=dict(file='capture.bin',**expected))
+        receipt.update(outcome='completed',captureCompleted=True,artifact=dict(file=final_name,**expected))
     except N.ProcessFailure as failure:
         receipt['outcome']=failure.code; receipt['processes'].append(failure.summary)
     except CaptureFailure as failure: receipt['outcome']=str(failure)
@@ -229,11 +339,13 @@ def capture(manifest_path, manifest_pin, plan_path, plan_pin, bundle, output, ca
     except (OSError, ValueError, UnicodeError): receipt['outcome']='artifact-io-failed'
     if not receipt['captureCompleted'] and data.exists():
         receipt['incompleteArtifact']=dict(file='work/capture.bin',admitted=False)
+    if admitted['full'] and not receipt['captureCompleted'] and os.path.lexists(output/'full-storage.bin'):
+        receipt['incompleteFinalArtifact']=dict(file='full-storage.bin',admitted=False)
     receipt['nativeDiagnosticCodes']=diagnostic_codes(receipt['processes'])
     receipt['recovery']=dict(nativeDispatchOccurred=receipt['captureDispatchAttempted'], normalBootCheckRequired=True,
         normalBootVerified=False, automaticRetryAllowed=False,
-        action='return-to-normal-boot-and-check-connectivity' if receipt['captureDispatchAttempted']
-               else 'inspect-preflight-and-confirm-normal-boot')
+        action=('review-device-state-before-normal-boot' if admitted['full'] else 'return-to-normal-boot-and-check-connectivity')
+               if receipt['captureDispatchAttempted'] else 'inspect-preflight-and-confirm-normal-boot')
     receipt['deviceStateUncertain']=receipt['captureDispatchAttempted']
     receipt['finishedAtUtc']=datetime.now(timezone.utc).isoformat()
     P.export(receipt,output/'receipt.json')
@@ -251,7 +363,7 @@ def main():
     try:
         values = (args.manifest,args.manifest_sha256,args.plan,args.plan_sha256,args.bundle)
         if args.action=='inspect':
-            require(args.output is None); result=inspect(*values)
+            result=inspect(*values,output=args.output)
         else:
             require(args.output is not None); result=capture(*values,args.output)
         print(json.dumps(dict(outcome=result.get('outcome','inspected'),readyForApply=False,

@@ -54,6 +54,24 @@ def main():
         receipts.append(dict(kind=kind,receiptSha256=adapter.P.digest(receipt),captureCompleted=True,readyForApply=False))
     # Compile-time fixture variants cannot discover real USB and need no runtime
     # environment injection into the production adapter's restricted environment.
+    # Full-area integration still uses the linked USB stub, never hardware.
+    full_bundle=work/'full-bundle'; full_bundle.mkdir()
+    full_host=fixture/('readonly-host-full.exe' if os.name=='nt' else 'readonly-host-full')
+    shutil.copyfile(full_host,full_bundle/host_name)
+    for name in ('emmc_server_readonly.bin','intermezzo.bin'): shutil.copyfile(bundle/name,full_bundle/name)
+    full_manifest=json.loads(json.dumps(manifest))
+    full_manifest['files'][0].update(sha256=hashlib.sha256(full_host.read_bytes()).hexdigest(),sizeBytes=full_host.stat().st_size)
+    fm=work/'full-manifest.json';fm.write_text(json.dumps(full_manifest),encoding='utf-8');fh=hashlib.sha256(fm.read_bytes()).hexdigest()
+    evidence=dict(schema='openjibo.storage-capacity.v1',sectorSizeBytes=512,storageSectorCount=4105,sizeBytes=4105*512,sourceHash='b'*64,sourceBytes=512,physicalIdentityVerified=False,captureAuthenticityVerified=False)
+    full_plan=dict(schema='openjibo.readonly-full-storage-plan.v1',sourceRevision=revision,bundleSha256=fh,kind='full-user-area',startSector=0,sectorCount=4105,timeoutSeconds=60,capacityEvidence=evidence)
+    fp=work/'full-plan.json';fp.write_text(json.dumps(full_plan),encoding='utf-8');fo=work/'full-result'
+    launched=subprocess.run([sys.executable,'-I','-B',str(root/'capture_adapter.py'),'capture',
+        '--manifest',str(fm),'--manifest-sha256',fh,'--plan',str(fp),
+        '--plan-sha256',hashlib.sha256(fp.read_bytes()).hexdigest(),'--bundle',str(full_bundle),'--output',str(fo)],capture_output=True,text=True,timeout=80)
+    assert launched.returncode==0,launched.stderr
+    full_receipt=json.loads((fo/'receipt.json').read_bytes());assert full_receipt['captureCompleted'] and full_receipt['independentFinalRehash']
+    assert (fo/'full-storage.bin').read_bytes()==b'\x5A'*(4105*512)
+    receipts.append(dict(kind='full-user-area-synthetic',receiptSha256=adapter.P.digest(full_receipt),captureCompleted=True,readyForApply=False))
     for mode,code in (('handshake-command-failure','handshake-command-transfer-failed'),
                       ('handshake-reply-failure','handshake-reply-transfer-failed'),
                       ('init-failure','handshake-controller-uninitialized')):
@@ -85,11 +103,11 @@ def main():
         receipts.append(dict(kind=mode,receiptSha256=adapter.P.digest(receipt),captureCompleted=False,readyForApply=False))
     sources=work/'reviewed-source'; sources.mkdir()
     hashes=[]
-    for name in ('capture_adapter.py','capture_process.py','recovery_evidence.py','conversion_plan.py'):
+    for name in ('capture_adapter.py','capture_process.py','recovery_evidence.py','conversion_plan.py','storage_capacity.py'):
         shutil.copyfile(root/name,sources/name)
         hashes.append(dict(file='reviewed-source/'+name,sha256=hashlib.sha256((sources/name).read_bytes()).hexdigest()))
     (work/'proof.json').write_text(json.dumps(dict(scope='Actual C host with link-time USB stubs; no hardware',receipts=receipts,files=hashes),indent=2)+'\n',encoding='utf-8')
-    print('Bounded adapter native integration passed: prefix, EXT_CSD and three handshake failures, no hardware access.')
+    print('Bounded adapter native integration passed: prefix, EXT_CSD, synthetic full-area and three handshake failures, no hardware access.')
 
 
 if __name__=='__main__': main()
